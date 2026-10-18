@@ -43,8 +43,8 @@ jobs:
           $base = "https://github.com/gitleaks/gitleaks/releases/download/v$version"
           New-Item -ItemType Directory -Force .local-data/gitleaks | Out-Null
           Invoke-WebRequest "$base/$name" -OutFile ".local-data/$name"
-          $checks = (Invoke-WebRequest "$base/gitleaks_${version}_checksums.txt").Content
-          $line = ($checks -split "`n" | Where-Object { ($_ -split '\s+')[-1] -eq $name })
+          Invoke-WebRequest "$base/gitleaks_${version}_checksums.txt" -OutFile .local-data/gitleaks-checksums.txt
+          $line = (Get-Content .local-data/gitleaks-checksums.txt | Where-Object { (($_.Trim() -split '\s+')[-1]).TrimStart('*') -eq $name })
           if (!$line) { throw 'Missing official scanner checksum' }
           $expected = ($line -split '\s+')[0]
           if ((Get-FileHash ".local-data/$name" -Algorithm SHA256).Hash -ne $expected) { throw 'Scanner checksum mismatch' }

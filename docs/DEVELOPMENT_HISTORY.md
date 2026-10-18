@@ -60,6 +60,8 @@ Images gained byte-level validation/normalization, picker/paste/drop/previews/re
 
 **Release work:** first public source import, MIT license, polished documentation, source/artifact audits, stronger ignores and compiler path remapping. Application version stays 0.3.0; release preparation does not invent a functional version. Release notes bind the installer checksum to its source commit.
 
+The first private CI run caught scanner checksum parsing that depended on HTTP content type and trailing whitespace. CI now downloads the checksum as a file and parses trimmed text; checksum verification is retained rather than bypassed.
+
 **Limits now:** Windows x64, unsigned installer, slow Strong cold loading, host-code consent rather than sandboxing, best-effort redaction, no automatic data pruning. Targeted tests/fixtures do not constitute exhaustive quality, crash, adversarial or accessibility testing.
 
 Evidence: [decision 003](decisions/003-multimodal-continuation.md), [model measurements](MODEL_CALIBRATION.md), [acceptance](ACCEPTANCE.md), [release audit](RELEASE_AUDIT.md).

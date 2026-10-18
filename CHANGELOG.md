@@ -24,6 +24,7 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 - Foreign Ollama residency, including the same tag, is preserved rather than unloaded as app-owned.
 - Late image ingestion cannot attach to a different draft/project; closing model setup stops downloads.
 - Public builds remap compiler paths and omit development-only browser source paths.
+- Windows CI reads scanner checksum files explicitly as text, avoiding content-type and trailing-whitespace parsing failures.
 
 ### Changed
 
