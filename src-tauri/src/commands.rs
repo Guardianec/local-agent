@@ -455,11 +455,12 @@ mod tests {
             "& % ! $(noop)".into(),
             "київ".into(),
         ];
+        let environment = minimal_env(Path::new(&node), tmp.path());
         let plan = CommandPlan {
             executable: node.into(),
             args,
             directory: tmp.path().into(),
-            environment: BTreeMap::new(),
+            environment,
             timeout: Duration::from_secs(5),
         };
         let result = execute(plan, CancellationToken::new()).unwrap();

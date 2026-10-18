@@ -64,6 +64,8 @@ The first private CI run caught scanner checksum parsing that depended on HTTP c
 
 Private release rehearsal also exposed GitHub's normalization of spaces in uploaded asset names. The release pipeline now exports a hyphenated installer filename before creating SHA256SUMS, so published download names and checksum entries agree.
 
+Independent Windows CI exposed protocol fixtures depending on real host RAM and a Node argument fixture using an empty environment. A compile-time test-only memory fixture now drives protocol observations, and the Node test uses the production stripped environment. Real runtime memory gates and execution consent are unchanged; test isolation does not simulate model quality.
+
 **Limits now:** Windows x64, unsigned installer, slow Strong cold loading, host-code consent rather than sandboxing, best-effort redaction, no automatic data pruning. Targeted tests/fixtures do not constitute exhaustive quality, crash, adversarial or accessibility testing.
 
 Evidence: [decision 003](decisions/003-multimodal-continuation.md), [model measurements](MODEL_CALIBRATION.md), [acceptance](ACCEPTANCE.md), [release audit](RELEASE_AUDIT.md).

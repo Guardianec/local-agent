@@ -26,6 +26,7 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 - Public builds remap compiler paths and omit development-only browser source paths.
 - Windows CI reads scanner checksum files explicitly as text, avoiding content-type and trailing-whitespace parsing failures.
 - Public installer filenames avoid spaces so GitHub asset normalization cannot invalidate the checksum filename.
+- Protocol fixtures use test-only deterministic memory telemetry; the Node argument test uses the same stripped environment as production. CI no longer assumes a large-RAM developer machine or a Node runtime that tolerates an empty environment.
 
 ### Changed
 

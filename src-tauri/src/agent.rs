@@ -439,6 +439,7 @@ impl AppCore {
         let pressure_flag = memory_pressure.clone();
         let peak_ram = Arc::new(std::sync::atomic::AtomicU64::new(0));
         let sampled_ram = peak_ram.clone();
+        let memory_provider = self.provider.clone();
         let watchdog = tokio::spawn(async move {
             let mut used = Duration::ZERO;
             let mut last = Instant::now();
@@ -456,7 +457,7 @@ impl AppCore {
                 if task.state != "waiting_approval" {
                     used += elapsed;
                 }
-                if let Some(memory) = crate::lifecycle::memory_info() {
+                if let Some(memory) = memory_provider.memory_info() {
                     sampled_ram.fetch_max(
                         (memory.total_bytes - memory.available_bytes).max(0.0) as u64,
                         std::sync::atomic::Ordering::Relaxed,

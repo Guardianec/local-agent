@@ -45,6 +45,8 @@ pub trait ModelProvider: Send + Sync {
 pub struct Ollama {
     client: reqwest::Client,
     base_url: String,
+    #[cfg(test)]
+    test_memory: Option<MemoryInfo>,
 }
 impl Ollama {
     pub fn new() -> Result<Self> {
@@ -62,13 +64,26 @@ impl Ollama {
                     .detail(e)
                 })?,
             base_url: "http://127.0.0.1:11434".into(),
+            #[cfg(test)]
+            test_memory: None,
         })
     }
     #[cfg(test)]
     pub fn test_endpoint(endpoint: String) -> Self {
         let mut provider = Self::new().unwrap();
         provider.base_url = endpoint;
+        provider.test_memory = Some(MemoryInfo {
+            total_bytes: 32.0 * 1073741824.0,
+            available_bytes: 24.0 * 1073741824.0,
+        });
         provider
+    }
+    pub(crate) fn memory_info(&self) -> Option<MemoryInfo> {
+        #[cfg(test)]
+        if let Some(memory) = &self.test_memory {
+            return Some(memory.clone());
+        }
+        crate::lifecycle::memory_info()
     }
     async fn get(&self, path: &str) -> Result<Value> {
         let response = self
@@ -122,7 +137,7 @@ impl Ollama {
                         .into(),
                     gpu: None,
                     calibrations: vec![],
-                    memory: crate::lifecycle::memory_info(),
+                    memory: self.memory_info(),
                 }
             }
         };
@@ -137,7 +152,7 @@ impl Ollama {
                     message: e.message,
                     gpu: None,
                     calibrations: vec![],
-                    memory: crate::lifecycle::memory_info(),
+                    memory: self.memory_info(),
                 }
             }
         };
@@ -215,7 +230,7 @@ impl Ollama {
                 None
             },
             calibrations: store.list_limit("calibrations", 100).unwrap_or_default(),
-            memory: crate::lifecycle::memory_info(),
+            memory: self.memory_info(),
         }
     }
     pub async fn prepare(&self, name: &str, context: u32, cancel: CancellationToken) -> Result<()> {
