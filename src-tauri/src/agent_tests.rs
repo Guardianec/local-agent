@@ -637,10 +637,13 @@ async fn finish(core: &AppCore, id: &str, approve: bool) -> Task {
             }
         }
         assert!(
-            start.elapsed() < Duration::from_secs(20),
-            "{} {}",
+            // Shared Windows runners start several real npm checks more slowly.
+            start.elapsed() < Duration::from_secs(60),
+            "{} {} ({} commands; {} checks)",
             task.state,
-            task.summary
+            task.summary,
+            task.commands,
+            task.checks.len()
         );
         tokio::time::sleep(Duration::from_millis(15)).await;
     }

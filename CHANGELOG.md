@@ -27,6 +27,7 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 - Windows CI reads scanner checksum files explicitly as text, avoiding content-type and trailing-whitespace parsing failures.
 - Public installer filenames avoid spaces so GitHub asset normalization cannot invalidate the checksum filename.
 - Protocol fixtures use test-only deterministic memory telemetry; the Node argument test uses the same stripped environment as production. CI no longer assumes a large-RAM developer machine or a Node runtime that tolerates an empty environment.
+- Real-command fixtures allow a bounded 60-second wait and CI limits test parallelism on shared Windows runners; production budgets and test assertions are unchanged.
 
 ### Changed
 

@@ -66,6 +66,8 @@ Private release rehearsal also exposed GitHub's normalization of spaces in uploa
 
 Independent Windows CI exposed protocol fixtures depending on real host RAM and a Node argument fixture using an empty environment. A compile-time test-only memory fixture now drives protocol observations, and the Node test uses the production stripped environment. Real runtime memory gates and execution consent are unchanged; test isolation does not simulate model quality.
 
+The next CI run passed 87 of 88 native tests; the remaining real-command fixture exhausted a 20-second test deadline during an approval/check sequence. Its wait is now bounded at 60 seconds and CI limits parallel tests on the shared runner. Semantic assertions and production budgets remain intact.
+
 **Limits now:** Windows x64, unsigned installer, slow Strong cold loading, host-code consent rather than sandboxing, best-effort redaction, no automatic data pruning. Targeted tests/fixtures do not constitute exhaustive quality, crash, adversarial or accessibility testing.
 
 Evidence: [decision 003](decisions/003-multimodal-continuation.md), [model measurements](MODEL_CALIBRATION.md), [acceptance](ACCEPTANCE.md), [release audit](RELEASE_AUDIT.md).
