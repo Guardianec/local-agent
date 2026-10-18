@@ -3,6 +3,53 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test]
+async fn legacy_proposal_without_finish_timestamp_can_be_continued() {
+    let (endpoint, server, _) = mock_runtime(Arc::new(|_, _| json!({"message":{"role":"assistant","content":"Please review the retained proposal."},"done":true}))).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let p = project(&core, &tmp.path().join("project"));
+    let t = core
+        .start(
+            &p.id,
+            "Fix addition in math.cjs",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Project,
+            None,
+        )
+        .unwrap();
+    let mut prior = finish(&core, &t.id, false).await;
+    prior.finished_at = None;
+    prior.result = None;
+    prior.change_state = "proposed".into();
+    core.save(&prior).unwrap();
+    let (tx, rx) = oneshot::channel();
+    let handle = tokio::runtime::Handle::current();
+    let worker = core.clone();
+    std::thread::spawn(move || {
+        let _entered = handle.enter();
+        let _ = tx.send(worker.start(
+            &p.id,
+            "Fix it.",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Project,
+            Some(prior.id),
+        ));
+    });
+    let next = tokio::time::timeout(Duration::from_secs(3), rx)
+        .await
+        .expect("Continuation must not deadlock while saving the prior task")
+        .unwrap()
+        .unwrap();
+    let done = finish(&core, &next.id, false).await;
+    assert!(done.result.is_some());
+    server.abort();
+}
+
+#[tokio::test]
 async fn ambiguous_wording_uses_bounded_classifier_and_ask_cannot_authorize_edits() {
     let (endpoint, server, count) = mock_runtime(Arc::new(|body, index| {
         if index == 0 {

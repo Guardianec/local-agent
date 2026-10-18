@@ -245,7 +245,7 @@ pub fn failure(error: &AppError) -> TaskFailure {
 }
 
 pub fn terminal(task: &mut Task, error: Option<&AppError>, files: Vec<String>) {
-    if task.summary.trim().is_empty() {
+    if task.active() || task.summary.trim().is_empty() {
         task.state = "failed".into();
         task.summary = "Something ended unexpectedly before I could produce a response. Retry or prepare the retained evidence for Codex.".into();
     }

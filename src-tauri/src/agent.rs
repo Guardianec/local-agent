@@ -129,18 +129,6 @@ impl AppCore {
         *self.listener.lock().unwrap() = Some(f);
     }
     pub fn save(&self, task: &Task) -> Result<()> {
-        // Terminal publication belongs to run_task, after cleanup and result assembly.
-        if !task.active()
-            && task.finished_at.is_none()
-            && self
-                .active
-                .lock()
-                .unwrap()
-                .as_ref()
-                .is_some_and(|(id, _)| id == &task.id)
-        {
-            return Ok(());
-        }
         self.store.put("tasks", &task.id, task)?;
         if let Some(f) = self.listener.lock().unwrap().as_ref() {
             f(task);
@@ -716,7 +704,6 @@ impl AppCore {
             task.transition("escalation_ready");
             task.summary = task.route.reasons.join(". ");
             task.event("warning", "Prepare for Codex", task.summary.clone());
-            self.save(task)?;
             return Ok(());
         }
         let mut session = Session::new(cancel.clone());
@@ -735,7 +722,6 @@ impl AppCore {
                 .await?;
             task.summary=if result["status"]=="passed"{"Browser check completed. Review the observation and any blocked requests in Activity."}else{"Browser check did not complete. Review the recorded result."}.into();
             task.transition("review_ready");
-            self.save(task)?;
             return Ok(());
         }
         if matches!(task.preset.as_str(), "search" | "review") {
@@ -764,7 +750,6 @@ impl AppCore {
                 "Project changes inspected. Existing changes are shown in Activity.".into()
             };
             task.transition("review_ready");
-            self.save(task)?;
             return Ok(());
         }
         if task.snapshot_id.is_none() && task.intent != Intent::Converse {
@@ -815,7 +800,6 @@ impl AppCore {
                     )
                 };
                 task.transition("review_ready");
-                self.save(task)?;
                 return Ok(());
             }
         }

@@ -17,6 +17,7 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 - Enforce intent at native tool dispatch and Apply; diagnostics retain host-code consent and private-copy confinement for agent file operations.
 - Recover once from empty, interrupted or invalid model responses before bounded escalation. Failed diagnostic tests remain findings rather than unsolicited fix requests.
 - Publish structured terminal results after cleanup, acknowledge cancellation, recover interrupted tasks and render a frontend fallback for missing output.
+- Continue legacy proposals without a finish timestamp without deadlocking; terminal assembly rejects unexpected active outcomes.
 - Keep execution explanations with recorded validation evidence and retain existing local-tier continuation and offline Codex handoff.
 
 ### Added
