@@ -1,0 +1,6 @@
+import { ShieldCheck } from 'lucide-react';
+import type { Approval } from '../../generated/Approval';
+import { Dialog } from '../../components/ui/Dialog';
+export function ApprovalDialog({ approval, busy, onAnswer, onClose }: { approval: Approval | null; busy: boolean; onAnswer: (choice: string) => void; onClose: () => void }) {
+  return <Dialog open={approval !== null} onClose={onClose} title={approval?.title ?? 'Permission required'} description={approval?.detail} wide><div className="dialog-body"><div className="permission-scope"><ShieldCheck size={17}/><span>{approval?.risk === 'host_execution' ? 'Runs as your Windows account · not isolated' : 'Private task copy · original files unchanged'}</span></div><pre className="permission-preview">{approval?.preview}</pre><p className="muted small">This approval expires after 15 minutes and applies only to the operation shown.</p></div><div className="dialog-footer"><button className="button" data-neutral-focus disabled={busy} onClick={() => onAnswer('deny')}>Deny</button><div>{approval?.allowTask && <button className="button" disabled={busy} onClick={() => onAnswer('task')}>Allow for this task</button>}<button className="button primary" disabled={busy} onClick={() => onAnswer('once')}>Allow once</button></div></div></Dialog>;
+}

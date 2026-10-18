@@ -1,0 +1,18 @@
+import { chromium } from '@playwright/test';
+import fs from 'node:fs/promises';
+await fs.mkdir('.local-data/screenshots', { recursive: true });
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const page = browser.contexts()[0].pages()[0];
+console.log('Desktop URL:', page.url());
+console.log((await page.locator('body').innerText()).slice(0, 3000));
+await page.screenshot({ path: '.local-data/screenshots/desktop-empty.png' });
+await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
+await page.getByRole('dialog').waitFor();
+await page.screenshot({ path: '.local-data/screenshots/desktop-settings.png' });
+console.log('Settings dialog opened:', await page.getByRole('dialog').count());
+await page.getByRole('button', { name: 'Done', exact: true }).click();
+await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+await page.screenshot({ path: '.local-data/screenshots/desktop-models.png' });
+console.log('Model setup:', await page.getByRole('dialog').innerText());
+await page.getByRole('button', { name: 'Done', exact: true }).click();
+await browser.close();

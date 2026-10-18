@@ -1,0 +1,45 @@
+{
+  "name": "local-agent",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 1420",
+    "tauri": "tauri",
+    "desktop": "tauri dev",
+    "package": "tauri build",
+    "test": "vitest run",
+    "test:core": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:ui": "node scripts/native-smoke.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "lucide-react": "^0.468.0",
+    "monaco-editor": "^0.52.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@tauri-apps/cli": "^2.12.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^26.0.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  },
+  "description": "Windows desktop coding agent with local Ollama models, controlled tools and reviewable changes",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Guardianec/local-agent.git"
+  }
+}

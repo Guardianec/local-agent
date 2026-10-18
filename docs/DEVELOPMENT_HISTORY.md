@@ -1,0 +1,69 @@
+# Development history
+
+This journal records engineering milestones, not a fictional commit history. The source checkout had no commits or remote before public-release preparation. Earlier versions are reconstructed from the architecture handoff, implementation decisions, acceptance notes and calibration records. Dates are given only where supported. The initial public Git commit imports 0.3.0; old tags/releases are not fabricated.
+
+## Architecture and 0.1.0 — documented 2026-10-16
+
+**Goal:** make bounded local coding work accessible through a Windows GUI, with permissions, review and recovery.
+
+Tauri 2 provides the desktop shell, React/TypeScript the interface and Rust the authority boundary. Typed tools separate model requests from policy and execution. Private working copies keep agent edits away from originals until explicit Apply. SQLite WAL/FULL journals and encrypted content-addressed blobs support exact-byte Undo and conflict-aware recovery, including dirty Git projects.
+
+Project discovery, deterministic search/check recipes, a bounded agent loop, diff/check views, activity and offline handoff were implemented. Optional browser automation became typed Playwright scenarios: one approved origin, bounded steps, fresh profiles and an authenticated Windows named pipe. Rust brokers requests and checks DNS/IP boundaries.
+
+**Failures/fixes:** actual Windows tests showed npm loses its working folder with extended path syntax. Confined file paths stay extended/pinned, while validated child folders use ordinary drive paths. Personal Chrome rejected the stripped automation environment; matching Chromium is used without personal profiles. Browser tests assert zero forbidden HTTP bytes rather than claiming no speculative sockets.
+
+**Safety/decisions:** fixed recipes, concrete host-code consent, Windows Job Objects, handle confinement, protected secrets, review-hash binding and durable recovery. Root-journal identification made interrupted Undo/recovery repeatable. Startup reconciles a crash after file commit but before task-state persistence. An exclusive data-folder lock prevents competing controllers.
+
+**Limits then:** Ollama was initially absent, so protocol fixtures were not called model benchmarks. Host code was not sandboxed; no automatic pruning, unsigned installer and Windows-first scope were explicit.
+
+Evidence: [architecture baseline](../HANDOFF.md), [decision 001](decisions/001-implementation-details.md), [acceptance](ACCEPTANCE.md).
+
+## 0.2.0 — profiles and real model evidence, 2026-10-16
+
+**Goal:** turn nominal integration into a tested three-tier workflow on a 12 GB GPU.
+
+Fast/Balanced/Strong became configurable assignments with deterministic initial routing and explicit Strong gating. Calibration moved beyond synthetic compliance: an isolated addition task requires actual reading/editing and positive/negative/zero Node tests, immutable tests/config, final-manifest validation and unchanged originals. Historical Qwen3 4B Instruct Q4, 8B and 14B passed at 8K/full GPU on the reference PC. These are not today's defaults.
+
+**Failures/fixes:** Ollama exposed unresolved nested JSON Schema references and empty object schemas lacking properties. The provider now flattens schemas while Rust strictly parses arguments. A random tool-result proof tests observation consumption. Thinking-only 4B exhausted the response budget; the explicit Instruct variant passed. Reasoning controls are used only when supported.
+
+**Safety/decisions:** reports retain real evidence rather than trusting completion text. Digest/runtime/context identity prevents a different model inheriting readiness. All models share one policy harness.
+
+**Limits then:** Strong initially required full GPU residency; continuation was narrower. Small fixtures were not a general quality ranking.
+
+Evidence: [decision 002](decisions/002-model-profiles.md), [changelog](../CHANGELOG.md).
+
+## 0.2.1 — packaged-app verification (exact date not independently retained)
+
+**Goal:** verify embedded production assets/native IPC rather than only a development server.
+
+The existing record describes persisted assignments/reports, Strong consent/rejection, automatic Fast inference, GUI calibration and cancellation. A real Balanced task exercised edit/command approvals, checks, Apply and exact Undo. Minimum-size, dark/light and rendering-scale checks covered profile controls. The installed executable was compared read-only against the build, accounting for Tauri's expected installer marker.
+
+**Safety/fixes:** recovery/restart cases retain proposal/check evidence and refuse newer-file conflicts. The exact split of recovery work between 0.1 and 0.2.1 is not reconstructable from Git; this journal does not invent it.
+
+**Limits then:** unsigned installer, shared Ollama ownership and no exhaustive crash/adversarial campaign. Exact older benchmark data is historical, not current recommendations.
+
+Evidence: historical installed checks retained in [acceptance](ACCEPTANCE.md), [decisions](../DECISIONS.md).
+
+## 0.3.0 — multimodal continuation, 2026-10-17–18
+
+**Goal:** use three contemporary tiers effectively, continue investigations and support screenshots without weakening policy.
+
+Physical models moved into one registry: Qwen3.5 4B Q8 (16K), Qwen3.5 9B Q4 (32K), Qwen3.6 35B-A3B Q4 (32K). Explicit downloads gained progress/cancellation and quantization checks. Matching install receipts establish cleanup ownership; ambiguous/unrelated models remain protected.
+
+Sequential lifecycle control replaced Strong's full-GPU gate. Conservative memory preflight and sustained-RAM-pressure detection retain recoverable evidence. Foreign residency is preserved, even for the same tag. Deterministic failure/progress signals trigger compact continuation containing relevant tools, findings, checks, diff, image references, constraints and counters. Switching preserves task/snapshot/permissions/global budgets. Exhaustion prepares an accumulated Codex handoff.
+
+Images gained byte-level validation/normalization, picker/paste/drop/previews/removal, opaque references and DPAPI blobs. Ollama gets transient native image payloads over loopback. Pixels are omitted from handoff export with an explicit notice.
+
+**Failures/fixes:** a real rename attempt copied displayed line numbers during model reconstruction. It failed acceptance without changing originals. Approved deterministic `rename_file` now preserves exact bytes and refuses changed source/collisions/escapes; the repeat passed actual Apply/Undo. Stale checks retain their original outcome. Model notes remain unverified; completion claims use recorded evidence. Closing setup cancels downloads; late ingestion cannot target a different draft.
+
+**Actual evidence:** all defaults passed isolated coding checks on RTX 4070 Super/i5-12400F/32 GB RAM, Ollama 0.40.5. Strong passed partial GPU/RAM placement at about 9.05 GiB GPU allocation, 7.21 GiB minimum free RAM. Actual vision read screenshot-only text and found overlap; Balanced image-guided CSS passed checks/review/Apply/Undo. An intentionally unavailable dependency fixture verified real Balanced → Strong → Codex continuation in 79 seconds, retaining two failed checks; it did not pretend to fix an impossible dependency.
+
+**Release work:** first public source import, MIT license, polished documentation, source/artifact audits, stronger ignores and compiler path remapping. Application version stays 0.3.0; release preparation does not invent a functional version. Release notes bind the installer checksum to its source commit.
+
+**Limits now:** Windows x64, unsigned installer, slow Strong cold loading, host-code consent rather than sandboxing, best-effort redaction, no automatic data pruning. Targeted tests/fixtures do not constitute exhaustive quality, crash, adversarial or accessibility testing.
+
+Evidence: [decision 003](decisions/003-multimodal-continuation.md), [model measurements](MODEL_CALIBRATION.md), [acceptance](ACCEPTANCE.md), [release audit](RELEASE_AUDIT.md).
+
+## Future entries
+
+Record version/date, motivation, changed architecture/features, bugs/failures fixed, runtime/model changes, safety effects, real validation and known limits. Link decisions and release notes. Distinguish measurements from plans. Never manufacture history or benchmark results.

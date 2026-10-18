@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "tiers": [
+    { "tier": "fast", "provider": "ollama", "modelId": "qwen3.5:4b-q8_0", "displayName": "Qwen3.5 4B", "family": "qwen35", "architecture": "Dense · hybrid attention", "quantization": "Q8_0", "vision": true, "tools": true, "thinking": true, "context": 16384, "downloadBytes": 5200000000, "offloadExpected": false, "purpose": "Simple tasks and lightweight images" },
+    { "tier": "balanced", "provider": "ollama", "modelId": "qwen3.5:9b-q4_K_M", "displayName": "Qwen3.5 9B", "family": "qwen35", "architecture": "Dense · hybrid attention", "quantization": "Q4_K_M", "vision": true, "tools": true, "thinking": true, "context": 32768, "downloadBytes": 6600000000, "offloadExpected": false, "purpose": "Recommended for coding and everyday agent work" },
+    { "tier": "strong", "provider": "ollama", "modelId": "qwen3.6:35b-a3b-q4_K_M", "displayName": "Qwen3.6 35B-A3B", "family": "qwen35moe", "architecture": "Mixture of experts · ~3B active", "quantization": "Q4_K_M", "vision": true, "tools": true, "thinking": true, "context": 32768, "downloadBytes": 24000000000, "offloadExpected": true, "purpose": "Final local attempt · slower · uses system RAM" }
+  ],
+  "legacy": [
+    { "tier": "fast", "modelId": "qwen3:4b-instruct-2507-q4_K_M" },
+    { "tier": "balanced", "modelId": "qwen3:8b" },
+    { "tier": "strong", "modelId": "qwen3:14b" }
+  ]
+}

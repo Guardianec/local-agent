@@ -1,0 +1,10 @@
+import { chromium, expect } from '@playwright/test';
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const page = browser.contexts()[0].pages()[0];
+await expect(page.getByRole('button', { name: 'Run the project tests.', exact: true })).toBeVisible();
+await page.getByRole('button', { name: 'Run the project tests.', exact: true }).click();
+await expect(page.locator('.task-status')).toContainText('Ready for review');
+await page.getByRole('button', { name: 'Checks 1', exact: true }).click();
+await expect(page.locator('.check-evidence')).toContainText('AssertionError');
+console.log('PASS: native restart preserved project, completed task history and exact check evidence');
+await browser.close();

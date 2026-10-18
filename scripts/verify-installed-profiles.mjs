@@ -1,0 +1,18 @@
+import { modelIds } from './model-registry.mjs';
+import { chromium, expect } from '@playwright/test';
+const browser=await chromium.connectOverCDP('http://127.0.0.1:9223');
+const page=browser.contexts()[0].pages()[0];
+const errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+if(!page.url().startsWith('http://tauri.localhost'))throw Error('This must verify embedded production assets');
+await page.getByRole('button',{name:'Auto routing',exact:true}).click();
+await expect(page.getByLabel('Fast model')).toHaveValue(modelIds.fast);
+await expect(page.getByLabel('Balanced model')).toHaveValue(modelIds.balanced);
+await expect(page.getByLabel('Strong model')).toHaveValue(modelIds.strong);
+await expect(page.getByRole('checkbox')).toBeChecked();
+await expect(page.getByText('Coding test passed',{exact:false})).toHaveCount(3);
+await page.screenshot({animations:'disabled',path:'.local-data/screenshots/installed-model-profiles.png'});
+await page.getByRole('button',{name:'Done',exact:true}).click();
+if(errors.length)throw Error(errors.join('\n'));
+console.log('PASS: installed production assets, native IPC, all three saved profiles and actual calibration evidence');
+await browser.close();

@@ -1,0 +1,28 @@
+import { chromium, expect } from '@playwright/test';
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9223');
+const page = browser.contexts()[0].pages()[0];
+await page.setViewportSize({ width: 1000, height: 700 });
+await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
+await page.getByRole('button', { name: 'Light', exact: true }).click();
+await page.getByRole('button', { name: 'Done', exact: true }).click();
+await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+await page.screenshot({ animations: 'disabled', path: '.local-data/screenshots/light-narrow.png' });
+const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+if (overflow) throw new Error('Workspace overflows the minimum viewport');
+await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
+await page.keyboard.press('Tab');
+await expect(page.getByRole('dialog')).toContainText('Browser capability');
+const trapped = await page.getByRole('dialog').evaluate(el => el.contains(document.activeElement));
+if (!trapped) throw new Error('Dialog keyboard focus escaped');
+await page.screenshot({ animations: 'disabled', path: '.local-data/screenshots/light-settings.png' });
+await page.getByRole('button', { name: 'Dark', exact: true }).click();
+await page.keyboard.press('Escape');
+await expect(page.getByRole('dialog')).toHaveCount(0);
+const cdp = await page.context().newCDPSession(page);
+await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1.5, mobile: false });
+await page.screenshot({ animations: 'disabled', path: '.local-data/screenshots/dark-150dpi.png' });
+await cdp.send('Emulation.clearDeviceMetricsOverride');
+await page.setViewportSize({ width: 1360, height: 900 });
+console.log('PASS: minimum-width layout, light/dark theme, dialog focus/Escape and 150% rendering');
+await browser.close();
+
