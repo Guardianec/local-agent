@@ -1,4 +1,4 @@
-# Public release audit — 0.3.0
+# Public release audit вЂ” 0.3.0
 
 Prepared 2026-10-18. Scope: the exact initial Git tree/history and newly built Windows installer, not every ignored file on a developer's computer.
 
@@ -8,7 +8,7 @@ The checkout initially had no commits/remotes, so no hidden old Git history need
 
 Targeted filename/content scans cover credentials/tokens/passwords, .env, private home paths/emails, logs/databases/model data, temporary files and binaries. The initial source scan's only email match was reserved synthetic fixture data. Gitleaks independently checks proposed tree/history. No broad application-source suppression is used. Public author metadata uses a GitHub no-reply address.
 
-Ignores exclude local app/task data, dependencies/build output, credentials, personal tool settings, databases, weights, installers/debug files and temporary output. Lockfiles and generated IPC contracts intentionally remain source. Icons are small source assets. No private screenshots, logs, weights or benchmark databases are publication assets.
+Ignores exclude local app/task data, dependencies/build output, credentials, personal tool settings, databases, weights, installers/debug files and temporary output. Lockfiles and generated IPC contracts intentionally remain source. Icons are small source assets. No private screenshots, logs, weights or benchmark databases are publication assets. The README image is a visually reviewed native screenshot of a disposable synthetic fixture; its PNG contains no text/EXIF metadata chunks. Automated binary checks do not perform OCR, so visual review remains required.
 
 ## Installer
 
