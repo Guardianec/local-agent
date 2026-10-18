@@ -579,6 +579,10 @@ mod tests {
         };
         let snapshot = capture(&store, &p, &tokio_util::sync::CancellationToken::new()).unwrap();
         let t = Task {
+            intent: Intent::Execute,
+            intent_reason: String::new(),
+            conversation_context: String::new(),
+            result: None,
             id: id(),
             project_id: p.id.clone(),
             request: "edit".into(),

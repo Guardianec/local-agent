@@ -17,7 +17,9 @@ async fn main() -> Result<()> {
     let source = root.join(".local-data/v03-vision");
     let verified = Store::open(&root.join(".local-data/model-verification-v03"))?;
     let core = AppCore::open(&source.join(format!("data-{}", id())))?;
-    let settings = verified.settings();
+    let mut settings = verified.settings();
+    // Disposable acceptance configuration; normal matching benchmark and confirmation gates still run.
+    settings.model_profiles.strong_enabled = true;
     core.store.put("settings", "main", &settings)?;
     let health = core.provider.health(&verified).await;
     let model = health
@@ -25,9 +27,23 @@ async fn main() -> Result<()> {
         .iter()
         .find(|m| m.name == name)
         .ok_or_else(|| AppError::new("MODEL_MISSING", "Benchmark this installed model first."))?;
-    let key = format!("{}:{}", model.digest, health.version.unwrap_or_default());
+    let key = format!(
+        "{}:{}",
+        model.digest,
+        health.version.as_deref().unwrap_or_default()
+    );
     let probe: serde_json::Value = verified.get("probes", &key)?;
     core.store.put("probes", &key, &probe)?;
+    for available in &health.models {
+        let key = format!(
+            "{}:{}",
+            available.digest,
+            health.version.as_deref().unwrap_or_default()
+        );
+        if let Ok(probe) = verified.get::<serde_json::Value>("probes", &key) {
+            core.store.put("probes", &key, &probe)?;
+        }
+    }
     for report in verified.list::<ModelCalibration>("calibrations")? {
         core.store.put(
             "calibrations",
@@ -59,12 +75,12 @@ async fn main() -> Result<()> {
     let request = if coding {
         "Fix the layout issue shown in the attached screenshot. Inspect project files and change only styles.css so the Save settings button uses normal flow below the email field without covering it. Remove obsolete offsets. Run the existing test recipe. Do not change tests, HTML or package.json."
     } else {
-        "Describe the attached screenshot: quote the exact numeric error code in the red banner and explain the visible problem with the Save settings button. Do not read project files; they have no screenshot information. Finish with your description."
+        "What looks wrong in the attached screenshot? Quote the exact numeric error code in the red banner and explain the visible problem with the Save settings button. Do not read project files; they have no screenshot information. Finish with your description."
     };
     let task = core.start_with_inputs(
         &project.id,
         request,
-        if coding { "task" } else { "explain" },
+        "task",
         Some(format!("@profile/{tier}")),
         if coding { Mode::Project } else { Mode::Observe },
         None,
@@ -89,7 +105,15 @@ async fn main() -> Result<()> {
                             && test == std::fs::read(work.join("test.cjs")).ok()
                             && std::fs::read_dir(&work).is_ok_and(|entries| entries.count() == 4)
                     });
-            let _ = core.answer(&t.id, &a.id, if safe { "once" } else { "deny" });
+            let _ = core.answer(
+                &t.id,
+                &a.id,
+                if safe || a.title == "Escalate this investigation to Strong?" {
+                    "once"
+                } else {
+                    "deny"
+                },
+            );
         }
         if started.elapsed() > Duration::from_secs(300) {
             let _ = core.cancel(&task.id);
@@ -111,7 +135,10 @@ async fn main() -> Result<()> {
     } else {
         let expected: serde_json::Value =
             serde_json::from_slice(&std::fs::read(source.join("expected.json"))?)?;
-        passed &= done.summary.contains(expected["code"].as_str().unwrap());
+        passed &= done.summary.contains(expected["code"].as_str().unwrap())
+            && done.intent == Intent::Converse
+            && done.tool_calls == 0
+            && done.snapshot_id.is_none();
     }
     let result = serde_json::json!({"passed":passed,"tier":tier,"model":name,"kind":if coding{"vision+coding"}else{"vision"},"taskId":done.id,"state":done.state,"summary":done.summary,"seconds":started.elapsed().as_secs_f64(),"checks":done.checks,"metrics":done.metrics,"snapshotId":done.snapshot_id,"data":core.store.root});
     std::fs::write(

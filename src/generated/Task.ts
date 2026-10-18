@@ -3,10 +3,12 @@ import type { AgentEvent } from "./AgentEvent";
 import type { Approval } from "./Approval";
 import type { Check } from "./Check";
 import type { ContentBlock } from "./ContentBlock";
+import type { Intent } from "./Intent";
 import type { Mode } from "./Mode";
 import type { ModelStage } from "./ModelStage";
 import type { Route } from "./Route";
 import type { TaskContinuationContext } from "./TaskContinuationContext";
 import type { TaskMetrics } from "./TaskMetrics";
+import type { TaskResult } from "./TaskResult";
 
-export type Task = { id: string, projectId: string, request: string, preset: string, state: string, changeState: string, revision: number, mode: Mode, createdAt: string, finishedAt: string | null, model: string | null, route: Route, summary: string, warnings: Array<string>, events: Array<AgentEvent>, checks: Array<Check>, approval: Approval | null, turns: number, toolCalls: number, commands: number, generatedTokens: number, modelEvalMs: number, parentTaskId: string | null, snapshotId: string | null, inputs: Array<ContentBlock>, automaticEscalation: boolean, stages: Array<ModelStage>, continuation: TaskContinuationContext | null, metrics: TaskMetrics, };
+export type Task = { intent: Intent, intentReason: string, conversationContext: string, result: TaskResult | null, id: string, projectId: string, request: string, preset: string, state: string, changeState: string, revision: number, mode: Mode, createdAt: string, finishedAt: string | null, model: string | null, route: Route, summary: string, warnings: Array<string>, events: Array<AgentEvent>, checks: Array<Check>, approval: Approval | null, turns: number, toolCalls: number, commands: number, generatedTokens: number, modelEvalMs: number, parentTaskId: string | null, snapshotId: string | null, inputs: Array<ContentBlock>, automaticEscalation: boolean, stages: Array<ModelStage>, continuation: TaskContinuationContext | null, metrics: TaskMetrics, };

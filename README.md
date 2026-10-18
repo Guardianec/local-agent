@@ -6,6 +6,10 @@ Built with Tauri 2, React, TypeScript and Rust. Inference uses Ollama's local AP
 
 [Download Windows installer](https://github.com/Guardianec/local-agent/releases/latest) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md) · [Development history](docs/DEVELOPMENT_HISTORY.md) · [Contributing](CONTRIBUTING.md)
 
+## 0.3.1 stabilization candidate
+
+The working source adds Auto / Ask / Act interaction selection: talk normally, inspect without authorizing edits, or perform requested work. Answers are preserved, follow-ups retain compact context, and failures/cancellation produce visible results with Retry, offline Codex handoff and sanitized diagnostics. See [the stabilization contract](docs/decisions/005-conversational-outcomes.md). The download below remains the published 0.3.0 release until a new release is authorized and published.
+
 ## What it does
 
 - Read/search a project, propose edits, and run explicitly approved test/lint/build recipes.

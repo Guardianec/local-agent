@@ -41,3 +41,4 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("Local Agent could not start");
 }
+pub mod interaction;

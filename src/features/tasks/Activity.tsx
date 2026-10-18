@@ -1,13 +1,17 @@
+import { useState } from 'react';
+import { outcomeText, diagnostics } from './outcome';
 import { AlertTriangle, Check, ChevronDown, Circle, FilePenLine, Search, Shield, TerminalSquare } from 'lucide-react';
 import type { Task } from '../../generated/Task';
 const icons: Record<string, typeof Circle> = { warning: AlertTriangle, validation: Check, changes: FilePenLine, approval: Shield, tool: Search, usage: TerminalSquare };
-export function Activity({ task }: { task: Task }) {
+export function Activity({ task, onRetry }: { task: Task; onRetry?: () => void }) {
+  const [copyStatus, setCopyStatus] = useState('');
+  const answer = outcomeText(task);
   return <div className="activity"><div className="activity-request"><span className="request-avatar">You</span><div><div className="eyebrow">TASK</div><p>{task.request}</p></div></div>
-    <div className="timeline">{task.events.map(event => {
+    <details open={!answer}><summary>Activity details</summary><div className="timeline">{task.events.map(event => {
       const Icon = icons[event.kind] ?? Circle;
       return <div className={`timeline-event ${event.kind}`} key={event.id}><span className="timeline-dot"><Icon size={14}/></span><div className="timeline-content">{event.detail ? <details><summary><span>{event.title}</span><ChevronDown size={13}/><time>{new Date(event.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></summary><pre>{event.detail}</pre></details> : <div className="event-title">{event.title}<time>{new Date(event.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>}</div></div>;
-    })}</div>
-    {task.summary && <div className={`task-outcome ${task.state === 'failed' ? 'failed' : ''}`}><span className="eyebrow">{task.state === 'escalation_ready' ? 'READY FOR A HANDOFF' : 'TASK RESULT'}</span><p>{task.summary}</p>{task.warnings.map((w, i) => <p className="warning-text" key={i}>{w}</p>)}</div>}
+    })}</div></details>
+    {answer && <div className={`task-outcome ${task.state === 'failed' ? 'failed' : ''}`}><span className="eyebrow">{task.state === 'escalation_ready' ? 'READY FOR A HANDOFF' : 'TASK RESULT'}</span><p style={{ whiteSpace: 'pre-wrap' }}>{answer}</p><button className="button" onClick={() => { void navigator.clipboard.writeText(diagnostics(task)).then(() => setCopyStatus('Diagnostics copied'), () => setCopyStatus('Copy failed; select the technical details below')); }}>Copy diagnostics</button><span role="status">{copyStatus}</span>{onRetry && <button className="button" onClick={onRetry}>Retry</button>}<details><summary>Technical details</summary><pre>{diagnostics(task)}</pre></details>{task.warnings.map((w, i) => <p className="warning-text" key={i}>{w}</p>)}</div>}
   </div>;
 }
 export function Checks({ task }: { task: Task }) {

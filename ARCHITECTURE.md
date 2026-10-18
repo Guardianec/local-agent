@@ -42,3 +42,9 @@ Additive task fields use Serde defaults: structured inputs, frozen escalation pr
 An in-task tier transition keeps the same task ID, snapshot, working files, check records, grants, denied operations and remaining limits. An explicit **Continue task** remains a new user-started task, as before. On restart, interrupted tasks do not resume commands or approvals automatically.
 
 There is no cloud inference, cloud model subscription, automatic external image transmission, new browser operator, desktop controller, MCP ecosystem or background autonomy in this update.
+
+## 0.3.1 stabilization
+
+[Decision 005](docs/decisions/005-conversational-outcomes.md) defines the interaction and terminal-result contracts. `interaction.rs` separates Converse/Inspect/Execute from model selection. Explicit constraints, project/prior-task context and a bounded optional local classification feed intent-specific prompts and schemas. `agent_tools.rs` enforces intent again at dispatch, alongside existing permissions.
+
+The controller publishes `TaskResult` after cleanup on success, failure, escalation or cancellation; restart reconciliation supplies interrupted results. `Task::transition` records lifecycle edges and unexpected-edge diagnostics. The frontend renders the result separately from Activity, with a terminal fallback and allowlisted Copy diagnostics. See the decision for transition edges, failure semantics and the host-code limitation on diagnostic commands.

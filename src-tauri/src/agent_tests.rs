@@ -2,6 +2,254 @@ use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+#[tokio::test]
+async fn ambiguous_wording_uses_bounded_classifier_and_ask_cannot_authorize_edits() {
+    let (endpoint, server, count) = mock_runtime(Arc::new(|body, index| {
+        if index == 0 {
+            assert!(body["tools"].as_array().is_none_or(Vec::is_empty));
+            json!({"message":{"role":"assistant","content":"inspect"},"done":true})
+        } else {
+            json!({"message":{"role":"assistant","content":"Inspection report."},"done":true})
+        }
+    }))
+    .await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let p = project(&core, &tmp.path().join("project"));
+    let t = core
+        .start(
+            &p.id,
+            "Please take a closer look.",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Project,
+            None,
+        )
+        .unwrap();
+    let done = finish(&core, &t.id, false).await;
+    assert_eq!(done.intent, Intent::Inspect);
+    assert_eq!(count.load(Ordering::SeqCst), 2);
+    assert!(done.snapshot_id.is_some());
+    assert_eq!(
+        crate::interaction::infer("Fix math.cjs", "ask", Some(&done), &p).0,
+        Intent::Inspect
+    );
+    assert_eq!(
+        crate::interaction::infer("Okay, apply that fix.", "task", Some(&done), &p).0,
+        Intent::Execute
+    );
+    server.abort();
+}
+
+#[test]
+fn lifecycle_has_explicit_legal_and_illegal_edges() {
+    assert!(crate::interaction::legal_transition(
+        "running",
+        "waiting_approval"
+    ));
+    assert!(crate::interaction::legal_transition(
+        "waiting_approval",
+        "running"
+    ));
+    assert!(crate::interaction::legal_transition(
+        "validating",
+        "running"
+    ));
+    assert!(crate::interaction::legal_transition("running", "cancelled"));
+    assert!(!crate::interaction::legal_transition(
+        "review_ready",
+        "running"
+    ));
+    assert!(!crate::interaction::legal_transition("running", "made_up"));
+}
+
+#[tokio::test]
+async fn intent_matrix_and_context_followup() {
+    let (endpoint, server, _, log) = mock_runtime_with_log(Arc::new(|_, _| json!({"message":{"role":"assistant","content":"The subtraction in math.cjs causes the failure."},"done":true}))).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let p = project(&core, &tmp.path().join("project"));
+    for (request, intent) in [
+        ("What is a Fenwick tree?", Intent::Converse),
+        ("What is a segment tree?", Intent::Converse),
+        ("What do you think about this architecture?", Intent::Converse),
+        ("Do you think this model setup is good?", Intent::Converse),
+        ("Can this application support MCP?", Intent::Converse),
+        ("Explain this function.", Intent::Inspect),
+        ("Look through this repository and tell me what you would improve. Do not modify anything.", Intent::Inspect),
+        ("Check whether the tests pass.", Intent::Inspect),
+        ("Find why this test fails, but don't change anything.", Intent::Inspect),
+        ("Fix the failing tests.", Intent::Execute),
+        ("Implement this small feature.", Intent::Execute),
+        ("What looks wrong?", Intent::Converse),
+        ("Fix this.", Intent::Execute),
+        ("Fix the UI. Do not change tests, HTML or package.json.", Intent::Execute),
+        ("How would you fix this?", Intent::Converse),
+        ("Can the app support authentication?", Intent::Converse),
+    ] {
+        let t = core.start(&p.id, request, "task", Some("@profile/balanced".into()), Mode::Project, None).unwrap();
+        let done = finish(&core, &t.id, false).await;
+        assert_eq!(done.intent, intent, "{request}");
+        assert!(!done.summary.trim().is_empty());
+        assert!(done.result.is_some(), "{request}");
+        assert_eq!(done.change_state, "none");
+    }
+    let t = core
+        .start(
+            &p.id,
+            "Why is this failing?",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Project,
+            None,
+        )
+        .unwrap();
+    let prior = finish(&core, &t.id, false).await;
+    let t = core
+        .start(
+            &p.id,
+            "Fix it.",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Project,
+            Some(prior.id),
+        )
+        .unwrap();
+    let done = finish(&core, &t.id, false).await;
+    assert_eq!(done.intent, Intent::Execute);
+    let requests = log.lock().unwrap();
+    let last = requests
+        .iter()
+        .rev()
+        .find(|r| r["path"] == "/api/chat")
+        .unwrap();
+    assert!(last["body"]["messages"]
+        .to_string()
+        .contains("subtraction in math.cjs"));
+    server.abort();
+}
+
+#[tokio::test]
+async fn empty_and_interrupted_responses_have_bounded_recovery() {
+    for (content, done_flag, recover) in [
+        ("   ", true, true),
+        ("", true, false),
+        ("partial", false, true),
+        ("partial", false, false),
+    ] {
+        let (endpoint, server, count) = mock_runtime(Arc::new(move |_, index| {
+            if recover && index > 0 {
+                json!({"message":{"role":"assistant","content":"Recovered answer."},"done":true})
+            } else {
+                json!({"message":{"role":"assistant","content":content},"done":done_flag})
+            }
+        }))
+        .await;
+        let tmp = tempfile::tempdir().unwrap();
+        let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+        Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+        configure_continuation_fixture(&core);
+        let mut settings = core.store.settings();
+        settings.intelligence.automatic_escalation = false;
+        core.store.put("settings", "main", &settings).unwrap();
+        let p = project(&core, &tmp.path().join("project"));
+        let t = core
+            .start(
+                &p.id,
+                "What is a tree?",
+                "task",
+                Some("@profile/balanced".into()),
+                Mode::Project,
+                None,
+            )
+            .unwrap();
+        let done = finish(&core, &t.id, false).await;
+        assert_eq!(count.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            done.state,
+            if recover {
+                "review_ready"
+            } else {
+                "escalation_ready"
+            }
+        );
+        assert!(done.result.is_some());
+        assert!(!done.summary.trim().is_empty());
+        assert_eq!(done.tool_calls, 0);
+        server.abort();
+    }
+}
+
+#[tokio::test]
+async fn inspect_blocks_unsolicited_writes_and_reports_failed_tests() {
+    let (endpoint, server, _) = mock_runtime(Arc::new(|body, index| match index {
+        0 => { assert!(!body["tools"].to_string().contains("apply_patch")); tool("create_file", json!({"path":"unauthorized.txt","content":"bad"})) },
+        1 => tool("inspect_project", json!({})),
+        2 => { let messages = body["messages"].as_array().unwrap(); let last = messages.iter().rev().find(|m| m["role"] == "tool").unwrap(); let result: Value = serde_json::from_str(last["content"].as_str().unwrap()).unwrap(); tool("run_project_command", json!({"recipeId":result["recipes"][0]["id"]})) },
+        _ => json!({"message":{"role":"assistant","content":"The test fails because addition subtracts. I did not edit files."},"done":true}),
+    })).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let p = project(&core, &tmp.path().join("project"));
+    let t = core
+        .start(
+            &p.id,
+            "Find why this test fails, but don't change anything.",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Project,
+            None,
+        )
+        .unwrap();
+    let done = finish(&core, &t.id, true).await;
+    assert_eq!(done.state, "review_ready", "{}", done.summary);
+    assert_eq!(done.checks.last().unwrap().status, "failed");
+    assert_eq!(done.stages.len(), 1);
+    assert_eq!(done.change_state, "none");
+    assert!(done.summary.contains("addition subtracts"));
+    assert!(!Path::new(&p.path).join("unauthorized.txt").exists());
+    assert!(!core.review(&done.id).unwrap().can_apply);
+    server.abort();
+}
+
+#[tokio::test]
+async fn conversation_preserves_answer_without_tools() {
+    let (endpoint, server, _, log) = mock_runtime_with_log(Arc::new(|_, _|
+        json!({"message":{"role":"assistant","content":"A Fenwick tree supports prefix sums."},"done":true})
+    )).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let p = project(&core, &tmp.path().join("project"));
+    let t = core
+        .start(
+            &p.id,
+            "What is a Fenwick tree?",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Project,
+            None,
+        )
+        .unwrap();
+    let done = finish(&core, &t.id, false).await;
+    assert_eq!(done.summary, "A Fenwick tree supports prefix sums.");
+    assert_eq!(done.tool_calls, 0);
+    assert!(log
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|r| r["path"] == "/api/chat")
+        .all(|r| r["body"]["tools"].as_array().is_none_or(Vec::is_empty)));
+    server.abort();
+}
+
 async fn mock_runtime(
     handler: Arc<dyn Fn(Value, usize) -> Value + Send + Sync>,
 ) -> (String, tokio::task::JoinHandle<()>, Arc<AtomicUsize>) {
@@ -628,6 +876,11 @@ async fn finish(core: &AppCore, id: &str, approve: bool) -> Task {
     loop {
         let task: Task = core.store.get("tasks", id).unwrap();
         if !task.active() {
+            assert!(
+                task.result.is_some(),
+                "Every terminal task must have a structured result: {}",
+                task.state
+            );
             return task;
         }
         if let Some(a) = &task.approval {

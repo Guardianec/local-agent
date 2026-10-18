@@ -139,6 +139,14 @@ pub struct Route {
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../src/generated/")]
 pub struct Task {
+    #[serde(default)]
+    pub intent: Intent,
+    #[serde(default)]
+    pub intent_reason: String,
+    #[serde(default)]
+    pub conversation_context: String,
+    #[serde(default)]
+    pub result: Option<TaskResult>,
     pub id: String,
     pub project_id: String,
     pub request: String,
@@ -176,6 +184,22 @@ pub struct Task {
     pub metrics: TaskMetrics,
 }
 impl Task {
+    pub fn transition(&mut self, next: &str) {
+        if self.state != next {
+            let legal = crate::interaction::legal_transition(&self.state, next)
+                || (self.finished_at.is_none() && next == "cancelled");
+            self.event(
+                if legal { "state" } else { "diagnostic" },
+                if legal {
+                    "Task state changed"
+                } else {
+                    "Unexpected state transition"
+                },
+                format!("{} → {}", self.state, next),
+            );
+            self.state = next.into();
+        }
+    }
     pub fn active(&self) -> bool {
         matches!(
             self.state.as_str(),
@@ -202,6 +226,41 @@ impl Task {
         }
         self.revision += 1;
     }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../../src/generated/")]
+pub enum Intent {
+    Converse,
+    Inspect,
+    #[default]
+    Execute,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/generated/")]
+pub struct TaskFailure {
+    pub category: String,
+    pub explanation: String,
+    pub recoverable: bool,
+    pub suggested_action: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/generated/")]
+pub struct TaskResult {
+    pub task_id: String,
+    pub status: String,
+    pub intent: Intent,
+    pub user_message: String,
+    pub files_changed: Vec<String>,
+    pub validations: Vec<String>,
+    pub warnings: Vec<String>,
+    pub failure: Option<TaskFailure>,
+    pub suggested_next_actions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

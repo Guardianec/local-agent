@@ -180,6 +180,10 @@ fn dirty_git_index_and_ignored_tracked_file_are_preserved() {
     copy.replace("a.txt", &hash(b"user dirty"), b"agent")
         .unwrap();
     let task = Task {
+        intent: Intent::Execute,
+        intent_reason: String::new(),
+        conversation_context: String::new(),
+        result: None,
         id: id(),
         project_id: p.id.clone(),
         request: "edit".into(),

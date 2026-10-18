@@ -57,6 +57,28 @@ impl AppCore {
             ));
         }
         task.tool_calls += 1;
+        if task.intent == Intent::Converse
+            || (task.intent == Intent::Inspect
+                && !matches!(
+                    name,
+                    "inspect_project"
+                        | "read_file"
+                        | "search_text"
+                        | "search_files"
+                        | "list_directory"
+                        | "git_status"
+                        | "git_diff"
+                        | "run_project_command"
+                        | "run_tests"
+                        | "finish_task"
+                        | "request_escalation"
+                ))
+        {
+            return Err(AppError::new(
+                "READ_ONLY",
+                "This interaction does not authorize that capability.",
+            ));
+        }
         let call = tools::parse(name, args)?;
         task.event(
             "tool",
@@ -317,6 +339,13 @@ impl AppCore {
                 json!({"deleted":a.path})
             }
             Call::Recipe(a) => {
+                if task.intent == Intent::Converse {
+                    return Err(AppError::new(
+                        "READ_ONLY",
+                        "Conversation cannot execute commands.",
+                    ));
+                }
+
                 if task.commands >= 6 {
                     return Err(AppError::new(
                         "LOOP_LIMIT",
@@ -330,6 +359,15 @@ impl AppCore {
                     .ok_or_else(|| {
                         AppError::new("RECIPE_INVALID", "Choose a registered project check.")
                     })?;
+                if task.intent == Intent::Inspect
+                    && (recipe.script.contains("fix")
+                        || !matches!(recipe.kind.as_str(), "test" | "lint"))
+                {
+                    return Err(AppError::new(
+                        "READ_ONLY",
+                        "Inspection permits approved tests or non-fixing lint checks only.",
+                    ));
+                }
                 let digest = projects::config_digest(root)?;
                 let mut recipe = recipe.clone();
                 recipe.config_digest = digest.clone();
@@ -471,6 +509,12 @@ impl AppCore {
                 json!({"changes":snapshots::deltas(&self.store,&snapshot)?.into_iter().map(|d|json!({"path":d.path,"additions":d.additions,"deletions":d.deletions})).collect::<Vec<_>>()})
             }
             Call::Finish(a) => {
+                if a.summary.trim().is_empty() {
+                    return Err(AppError::new(
+                        "INVALID_DATA",
+                        "Finish with a nonempty answer.",
+                    ));
+                }
                 task.summary = security::bounded(&security::redact(&a.summary), 12000);
                 task.event("result", "Agent notes (unverified)", task.summary.clone());
                 task.warnings.extend(
@@ -479,12 +523,12 @@ impl AppCore {
                         .take(20)
                         .map(|s| security::bounded(&security::redact(&s), 1000)),
                 );
-                task.state = "validating".into();
+                task.transition("validating");
                 json!({"status":"completion_requested"})
             }
             Call::Escalate(a) => {
                 task.summary = security::bounded(&security::redact(&a.reason), 4000);
-                task.state = "routing".into();
+                task.transition("routing");
                 json!({"status":"escalation_requested"})
             }
             Call::Browser(spec) => {
@@ -537,7 +581,8 @@ impl AppCore {
     }
     fn edit_allowed(&self, task: &Task, path: &str) -> Result<()> {
         let path = security::relative_path(path)?;
-        if task.mode == Mode::Observe || task.preset == "explain" {
+        if task.intent != Intent::Execute || task.mode == Mode::Observe || task.preset == "explain"
+        {
             return Err(AppError::new(
                 "READ_ONLY",
                 "This task can inspect files but cannot propose edits.",

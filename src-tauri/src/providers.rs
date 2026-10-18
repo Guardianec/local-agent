@@ -648,6 +648,12 @@ impl Decoder {
                 "The model response ended early. No incomplete tool requests were executed.",
             ));
         }
+        if self.content.trim().is_empty() && self.calls.is_empty() {
+            return Err(AppError::new(
+                "MODEL_RESPONSE_EMPTY",
+                "The local model returned no answer. No actions from this response were executed.",
+            ));
+        }
         let mut message = json!({"role":"assistant","content":self.content});
         if !self.thinking.is_empty() {
             message["thinking"] = json!(self.thinking);
