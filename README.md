@@ -72,7 +72,7 @@ Strong checks memory before loading and watches for sustained RAM pressure. Load
 
 ## Install
 
-1. Download `Local Agent_0.3.0_x64-setup.exe` from the [v0.3.0 release](https://github.com/Guardianec/local-agent/releases/tag/v0.3.0).
+1. Download `Local-Agent_0.3.0_x64-setup.exe` from the [v0.3.0 release](https://github.com/Guardianec/local-agent/releases/tag/v0.3.0).
 2. Optionally compare SHA-256 with the release's `SHA256SUMS` to verify the download.
 3. Run the per-user installer and open **Local Agent** from Start.
 4. Install/open Ollama separately. In **Auto routing в†’ Local models**, install desired tiers, check tool compatibility and run **Test coding**. Enable Strong after its matching benchmark passes.

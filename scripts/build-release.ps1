@@ -38,7 +38,7 @@ if ((git status --porcelain | Out-String).Trim()) { throw 'Build changed source 
 if ((git rev-parse HEAD).Trim() -ne $sourceCommit) { throw 'Source commit changed during release build.' }
 $outputPath = Join-Path 'release-artifacts' "v$version"
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
-$installerName = Split-Path -Leaf $installer
+$installerName = "Local-Agent_${version}_x64-setup.exe"
 Copy-Item -LiteralPath $installer -Destination (Join-Path $outputPath $installerName)
 $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText((Join-Path (Get-Location) "$outputPath/SHA256SUMS"), "$digest  $installerName`n", [Text.UTF8Encoding]::new($false))

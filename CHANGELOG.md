@@ -25,6 +25,7 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 - Late image ingestion cannot attach to a different draft/project; closing model setup stops downloads.
 - Public builds remap compiler paths and omit development-only browser source paths.
 - Windows CI reads scanner checksum files explicitly as text, avoiding content-type and trailing-whitespace parsing failures.
+- Public installer filenames avoid spaces so GitHub asset normalization cannot invalidate the checksum filename.
 
 ### Changed
 

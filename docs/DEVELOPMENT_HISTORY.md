@@ -62,6 +62,8 @@ Images gained byte-level validation/normalization, picker/paste/drop/previews/re
 
 The first private CI run caught scanner checksum parsing that depended on HTTP content type and trailing whitespace. CI now downloads the checksum as a file and parses trimmed text; checksum verification is retained rather than bypassed.
 
+Private release rehearsal also exposed GitHub's normalization of spaces in uploaded asset names. The release pipeline now exports a hyphenated installer filename before creating SHA256SUMS, so published download names and checksum entries agree.
+
 **Limits now:** Windows x64, unsigned installer, slow Strong cold loading, host-code consent rather than sandboxing, best-effort redaction, no automatic data pruning. Targeted tests/fixtures do not constitute exhaustive quality, crash, adversarial or accessibility testing.
 
 Evidence: [decision 003](decisions/003-multimodal-continuation.md), [model measurements](MODEL_CALIBRATION.md), [acceptance](ACCEPTANCE.md), [release audit](RELEASE_AUDIT.md).
