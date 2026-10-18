@@ -4,6 +4,10 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrected Windows code-page corruption in public documentation punctuation; application version, published tag and installer are unchanged.
+
 ## [0.3.0] - 2026-10-18
 
 ### Added

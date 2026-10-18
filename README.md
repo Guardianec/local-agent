@@ -4,7 +4,7 @@ A Windows desktop application for bounded coding tasks using models running on y
 
 Built with Tauri 2, React, TypeScript and Rust. Inference uses Ollama's local API. This is an early, Windows-first developer tool for repetitive work; difficult tasks can be packaged for a cloud coding agent without uploading anything automatically.
 
-[Download Windows installer](https://github.com/Guardianec/local-agent/releases/latest) В· [Architecture](ARCHITECTURE.md) В· [Changelog](CHANGELOG.md) В· [Development history](docs/DEVELOPMENT_HISTORY.md) В· [Contributing](CONTRIBUTING.md)
+[Download Windows installer](https://github.com/Guardianec/local-agent/releases/latest) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md) · [Development history](docs/DEVELOPMENT_HISTORY.md) · [Contributing](CONTRIBUTING.md)
 
 ## What it does
 
@@ -36,7 +36,7 @@ Fast explicitly uses Q8; there is no silent Q4 substitution. Approximate downloa
 
 ### Dynamic escalation
 
-Auto uses deterministic scope/failure signals rather than asking a model to judge its own ability. Ordinary substantive coding work starts with Balanced. Repeated tool errors, stalled progress, failed validation or context pressure can move a task through Fast в†’ Balanced в†’ Strong.
+Auto uses deterministic scope/failure signals rather than asking a model to judge its own ability. Ordinary substantive coding work starts with Balanced. Repeated tool errors, stalled progress, failed validation or context pressure can move a task through Fast → Balanced → Strong.
 
 A switch retains the same task, working copy, findings, checks, image references, permissions and remaining budgets. The previous app-owned model is released first. Strong needs a matching passing coding benchmark and confirmation. If local work cannot finish, **Prepare for Codex** retains the investigation. A manual tier sets the starting preference; automatic escalation can be disabled for new tasks.
 
@@ -75,7 +75,7 @@ Strong checks memory before loading and watches for sustained RAM pressure. Load
 1. Download `Local-Agent_0.3.0_x64-setup.exe` from the [v0.3.0 release](https://github.com/Guardianec/local-agent/releases/tag/v0.3.0).
 2. Optionally compare SHA-256 with the release's `SHA256SUMS` to verify the download.
 3. Run the per-user installer and open **Local Agent** from Start.
-4. Install/open Ollama separately. In **Auto routing в†’ Local models**, install desired tiers, check tool compatibility and run **Test coding**. Enable Strong after its matching benchmark passes.
+4. Install/open Ollama separately. In **Auto routing → Local models**, install desired tiers, check tool compatibility and run **Test coding**. Enable Strong after its matching benchmark passes.
 
 The installer is **unsigned**; Windows may display a publisher warning. Download only from this repository's releases. Close existing installations before upgrading and keep the same installation/data locations. Automatic updates are not configured.
 
@@ -83,7 +83,7 @@ The installer is **unsigned**; Windows may display a publisher warning. Download
 
 1. **Open project** and select a local project folder.
 2. Leave the model on **Auto** and start with **Ask before edits**.
-3. Describe a bounded task, such as вЂњFix the addition function and run the existing tests.вЂќ Attach a screenshot if useful.
+3. Describe a bounded task, such as “Fix the addition function and run the existing tests.” Attach a screenshot if useful.
 4. Watch **Activity**, approve intended actions, and inspect **Checks** and **Changes**.
 5. **Apply changes** copies the reviewed proposal into the project. **Undo applied changes** restores captured bytes if affected files have not since changed.
 6. If work stalls, **Prepare for Codex**, review the export and share it deliberately in your cloud tool.

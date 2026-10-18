@@ -72,6 +72,10 @@ The next CI run passed 87 of 88 native tests; the remaining real-command fixture
 
 Evidence: [decision 003](decisions/003-multimodal-continuation.md), [model measurements](MODEL_CALIBRATION.md), [acceptance](ACCEPTANCE.md), [release audit](RELEASE_AUDIT.md).
 
+## Documentation rendering correction - 2026-10-18
+
+Reviewing the public GitHub page exposed Windows code-page corruption in punctuation written during release preparation. Known mojibake sequences were normalized back to UTF-8 and the rendered page was checked again. This is a documentation-only correction on main: application behavior, version 0.3.0, its tested source tag and installer remain unchanged.
+
 ## Future entries
 
 Record version/date, motivation, changed architecture/features, bugs/failures fixed, runtime/model changes, safety effects, real validation and known limits. Link decisions and release notes. Distinguish measurements from plans. Never manufacture history or benchmark results.

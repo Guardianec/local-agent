@@ -1,4 +1,4 @@
-# Public release audit вЂ” 0.3.0
+# Public release audit — 0.3.0
 
 Prepared 2026-10-18. Scope: the exact initial Git tree/history and newly built Windows installer, not every ignored file on a developer's computer.
 
