@@ -1,0 +1,5 @@
+{
+  "name": "qa-032-shipping",
+  "private": true,
+  "scripts": { "test": "node --test" }
+}

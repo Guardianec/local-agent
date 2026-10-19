@@ -4,9 +4,25 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-19
+
 ### Fixed
 
-- Corrected Windows code-page corruption in public documentation punctuation; application version, published tag and installer are unchanged.
+- Route explicit named-file questions to Inspect and preserve execution requests with scoped no-edit constraints, including Ukrainian wording.
+- Preserve filenames and model explanations in final results while placing recorded changed files and checks first. Model prose is labeled unverified.
+- Classify unavailable/unbenchmarked model setup and release failures in structured task outcomes.
+- Use a required synthetic argument for strict tool compatibility checks, avoiding false rejection of the installed Balanced model on an empty-object probe.
+- Refresh the desktop smoke script's Inspect status assertions.
+- Carry forward the post-0.3.0 UTF-8 documentation punctuation correction; it did not change the 0.3.0 installer.
+
+### Added
+
+- Reproducible adversarial local-model QA cases on disposable projects, including hostile repository text, English/Ukrainian prompts, live cancellation and Strong comparison.
+- A 20-task two-project context-isolation regression and updated Balanced → Strong → offline Codex continuation acceptance.
+
+### Verified
+
+- Real Fast, Balanced and Strong model work, image-guided coding, desktop Apply/Undo, host-code approval, and retained failed-check handoff. See [the QA report](docs/QA_0.3.2.md) for exact results and limits.
 
 ## [0.3.1] - Unreleased stabilization candidate
 
@@ -92,5 +108,6 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 - Ollama initially unavailable: protocol fixtures verified the harness, not local-model quality; real hardware evidence arrived in 0.2.
 - Host code was not sandboxed; automatic retention cleanup was absent; installer unsigned.
 
-[Unreleased]: https://github.com/Guardianec/local-agent/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Guardianec/local-agent/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/Guardianec/local-agent/releases/tag/v0.3.2
 [0.3.0]: https://github.com/Guardianec/local-agent/releases/tag/v0.3.0

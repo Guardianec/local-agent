@@ -1357,7 +1357,18 @@ impl AppCore {
                 .join(", ");
             // Model prose stays clearly attributed; validation counts come only from records.
             let explanation = crate::interaction::explanation(&task.summary);
-            task.summary = format!("{explanation}Prepared changes to {} for review. {} of {} recorded checks passed.{}", paths, passed, task.checks.len(), if task.checks.is_empty() { " These changes have not been tested." } else { " See Checks for the tested source version." });
+            task.summary = format!(
+                "Prepared changes to {} for review. {} of {} recorded checks passed.{}{}",
+                paths,
+                passed,
+                task.checks.len(),
+                if task.checks.is_empty() {
+                    " These changes have not been tested."
+                } else {
+                    " See Checks for the tested source version."
+                },
+                explanation
+            );
         }
         // Publish the terminal state after model cleanup in run_task, so Review
         // never becomes actionable while the controller still owns inference.

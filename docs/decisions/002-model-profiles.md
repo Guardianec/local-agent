@@ -24,7 +24,7 @@ The user explicitly starts Test coding after a host-execution disclosure. A sepa
 
 Passing requires one eligible math-file diff, unchanged test/config files, actual passing checks tied to the final source manifest, and an unchanged original fixture. Reports retain real check/activity evidence, generated-token evaluation throughput, coding-task elapsed time, loaded allocation, GPU placement and minimum sampled free VRAM. A failed test cannot enable Strong. Cancellation cancels the child controller and retains disposable evidence.
 
-Compatibility uses a random punctuation-free proof token returned through a synthetic native tool and requires its exact appearance in a final response without another tool call. The same tool definitions are retained across the follow-up. This tests tool-result consumption without turning UUID punctuation copying into the compatibility criterion; the coding fixture still requires exact full file hashes.
+Compatibility uses a random punctuation-free proof token returned through a synthetic native tool and requires its exact appearance in a final response without another tool call. The probe tool takes one required enum argument (`request: "proof"`) and rejects extra keys; the empty-object form caused a false negative with the installed Balanced model despite successful real project tool use. The same tool definitions are retained across the follow-up. This tests strict tool arguments and tool-result consumption without turning UUID punctuation copying into the compatibility criterion; the coding fixture still requires exact full file hashes.
 
 ## Ollama interoperability findings
 

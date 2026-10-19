@@ -92,6 +92,19 @@ async fn ambiguous_wording_uses_bounded_classifier_and_ask_cannot_authorize_edit
 
 #[test]
 fn lifecycle_has_explicit_legal_and_illegal_edges() {
+    let explanation = crate::interaction::explanation(
+        "In `order.cjs`, shipping used the discounted amount. All tests passed.",
+    );
+    assert!(explanation.contains("`order.cjs`"));
+    assert!(explanation.contains("Model explanation (unverified)"));
+    assert_eq!(
+        crate::interaction::failure(&AppError::new(
+            "MODEL_CALIBRATION_REQUIRED",
+            "Enable Strong after a passing coding benchmark.",
+        ))
+        .category,
+        "MODEL_UNAVAILABLE"
+    );
     assert!(crate::interaction::legal_transition(
         "running",
         "waiting_approval"
@@ -120,6 +133,26 @@ async fn intent_matrix_and_context_followup() {
     Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
     configure_continuation_fixture(&core);
     let p = project(&core, &tmp.path().join("project"));
+    for (request, intent) in [
+        ("What is wrong with math.cjs?", Intent::Inspect),
+        ("Поясни, чому math.cjs працює неправильно.", Intent::Inspect),
+        (
+            "Знайди помилку, але поки нічого не змінюй.",
+            Intent::Inspect,
+        ),
+        ("Виправ помилку та запусти тести.", Intent::Execute),
+        ("Fix math.cjs. No edits to tests.", Intent::Execute),
+        (
+            "Fix math.cjs. Don't change anything except math.cjs.",
+            Intent::Execute,
+        ),
+    ] {
+        assert_eq!(
+            crate::interaction::infer(request, "task", None, &p).0,
+            intent,
+            "{request}"
+        );
+    }
     for (request, intent) in [
         ("What is a Fenwick tree?", Intent::Converse),
         ("What is a segment tree?", Intent::Converse),
@@ -177,6 +210,66 @@ async fn intent_matrix_and_context_followup() {
     assert!(last["body"]["messages"]
         .to_string()
         .contains("subtraction in math.cjs"));
+    server.abort();
+}
+
+#[tokio::test]
+async fn rapid_two_project_inspections_keep_context_separate() {
+    let (endpoint, server, _, log) = mock_runtime_with_log(Arc::new(
+        |_, _| json!({"message":{"role":"assistant","content":"Inspection complete."},"done":true}),
+    ))
+    .await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let alpha = project(&core, &tmp.path().join("alpha"));
+    let beta = project(&core, &tmp.path().join("beta"));
+    std::fs::write(
+        tmp.path().join("alpha/math.cjs"),
+        "// ALPHA_SYNTHETIC\nmodule.exports.add = (a,b) => a-b;\n",
+    )
+    .unwrap();
+    std::fs::write(
+        tmp.path().join("beta/math.cjs"),
+        "// BETA_SYNTHETIC\nmodule.exports.add = (a,b) => a-b;\n",
+    )
+    .unwrap();
+    for index in 0..20 {
+        let chosen = if index % 2 == 0 { &alpha } else { &beta };
+        let task = core
+            .start(
+                &chosen.id,
+                "Explain math.cjs.",
+                "task",
+                Some("@profile/balanced".into()),
+                Mode::Observe,
+                None,
+            )
+            .unwrap();
+        let done = finish(&core, &task.id, false).await;
+        assert_eq!(done.intent, Intent::Inspect);
+        assert_eq!(done.project_id, chosen.id);
+        assert_eq!(done.tool_calls, 0);
+        assert_eq!(done.change_state, "none");
+        let requests = log.lock().unwrap();
+        let chat = requests
+            .iter()
+            .rev()
+            .find(|request| request["path"] == "/api/chat")
+            .unwrap();
+        let body = chat["body"]["messages"].to_string();
+        let (own, other) = if index % 2 == 0 {
+            ("ALPHA_SYNTHETIC", "BETA_SYNTHETIC")
+        } else {
+            ("BETA_SYNTHETIC", "ALPHA_SYNTHETIC")
+        };
+        assert!(body.contains(own), "task {index} missed its own project");
+        assert!(
+            !body.contains(other),
+            "task {index} leaked the other project"
+        );
+    }
     server.abort();
 }
 
@@ -1063,9 +1156,18 @@ async fn malicious_tool_calls_exhaust_repair_budget_without_execution() {
 
 #[tokio::test]
 async fn synthetic_capability_probe_requires_tool_follow_up() {
-    let (endpoint, server, _) = mock_runtime(Arc::new(|body, index| {
+    let (endpoint, server, count) = mock_runtime(Arc::new(|body, index| {
         if index == 0 {
-            tool("read_probe", json!({}))
+            assert_eq!(
+                body["tools"][0]["function"]["parameters"]["required"],
+                json!(["request"])
+            );
+            tool("read_probe", json!({"probe_id":"1"}))
+        } else if index == 1 {
+            assert!(body["messages"]
+                .to_string()
+                .contains("Tool arguments were rejected"));
+            tool("read_probe", json!({"request":"proof"}))
         } else {
             let proof = body["messages"].as_array().unwrap().last().unwrap()["content"]
                 .as_str()
@@ -1082,6 +1184,7 @@ async fn synthetic_capability_probe_requires_tool_follow_up() {
         .unwrap();
     server.abort();
     assert_eq!(model.capability, "verified");
+    assert_eq!(count.load(Ordering::SeqCst), 3);
 }
 
 #[tokio::test]

@@ -6,9 +6,9 @@ Built with Tauri 2, React, TypeScript and Rust. Inference uses Ollama's local AP
 
 [Download Windows installer](https://github.com/Guardianec/local-agent/releases/latest) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md) · [Development history](docs/DEVELOPMENT_HISTORY.md) · [Contributing](CONTRIBUTING.md)
 
-## 0.3.1 stabilization candidate
+## 0.3.2 stabilization
 
-The working source adds Auto / Ask / Act interaction selection: talk normally, inspect without authorizing edits, or perform requested work. Answers are preserved, follow-ups retain compact context, and failures/cancellation produce visible results with Retry, offline Codex handoff and sanitized diagnostics. See [the stabilization contract](docs/decisions/005-conversational-outcomes.md). The download below remains the published 0.3.0 release until a new release is authorized and published.
+Auto / Ask / Act lets you talk normally, inspect without authorizing edits, or perform requested work. Answers are preserved, follow-ups retain compact context, and failures/cancellation produce visible results with Retry, offline Codex handoff and sanitized diagnostics. This update also corrects named-file question routing, scoped edit constraints, model setup failure categories and final explanation formatting. See the [stabilization contract](docs/decisions/005-conversational-outcomes.md) and [v0.3.2 QA report](docs/QA_0.3.2.md).
 
 ## What it does
 
@@ -76,7 +76,7 @@ Strong checks memory before loading and watches for sustained RAM pressure. Load
 
 ## Install
 
-1. Download `Local-Agent_0.3.0_x64-setup.exe` from the [v0.3.0 release](https://github.com/Guardianec/local-agent/releases/tag/v0.3.0).
+1. Download `Local-Agent_0.3.2_x64-setup.exe` from the [v0.3.2 release](https://github.com/Guardianec/local-agent/releases/tag/v0.3.2).
 2. Optionally compare SHA-256 with the release's `SHA256SUMS` to verify the download.
 3. Run the per-user installer and open **Local Agent** from Start.
 4. Install/open Ollama separately. In **Auto routing → Local models**, install desired tiers, check tool compatibility and run **Test coding**. Enable Strong after its matching benchmark passes.

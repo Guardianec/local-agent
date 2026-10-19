@@ -394,10 +394,10 @@ impl Ollama {
             ));
         }
         let tools = vec![
-            json!({"type":"function","function":{"name":"read_probe","description":"Read synthetic probe data. Call this exactly once.","parameters":{"type":"object","properties":{},"additionalProperties":false,"required":[]}}}),
+            json!({"type":"function","function":{"name":"read_probe","description":"Read synthetic probe data. Call this exactly once.","parameters":{"type":"object","properties":{"request":{"type":"string","enum":["proof"]}},"additionalProperties":false,"required":["request"]}}}),
         ];
         let mut messages = vec![
-            json!({"role":"system","content":"This is a tool compatibility check. Call read_probe with an empty object, then repeat the returned proof string in your final answer. Do not guess the proof."}),
+            json!({"role":"system","content":"This is a tool compatibility check. Call read_probe with exactly {\"request\":\"proof\"}, then repeat the returned proof string in your final answer. Do not guess the proof."}),
             json!({"role":"user","content":"Read the synthetic probe using the tool."}),
         ];
         let mut first = self
@@ -409,7 +409,7 @@ impl Ollama {
             let valid = calls.is_some_and(|calls| {
                 calls.len() == 1
                     && calls[0]["function"]["name"] == "read_probe"
-                    && calls[0]["function"]["arguments"] == json!({})
+                    && calls[0]["function"]["arguments"] == json!({"request":"proof"})
             });
             if valid {
                 break;
@@ -426,7 +426,7 @@ impl Ollama {
             }
             repairs += 1;
             messages.push(first.message);
-            messages.push(json!({"role":"tool","tool_name":"read_probe","content":"Tool arguments were rejected; nothing executed. read_probe accepts exactly an empty object {}. Do not add a parameters key, wrapper or string. Call read_probe once with {}."}));
+            messages.push(json!({"role":"tool","tool_name":"read_probe","content":"Tool arguments were rejected; nothing executed. read_probe accepts exactly {\"request\":\"proof\"}. Do not add other keys or wrappers. Call read_probe once with that object."}));
             first = self
                 .chat(name, &messages, &tools, 4096.into(), cancel.clone())
                 .await?;

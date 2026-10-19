@@ -13,45 +13,45 @@ pub fn infer(
     let contains = |terms: &[&str]| terms.iter().any(|s| text.contains(s));
     // Scoped constraints ("do not change tests") restrict an execution request;
     // they do not turn the whole interaction into inspection.
-    let readonly = contains(&[
-        "read-only review",
-        "read-only analysis",
-        "no edits",
-        "no modifications",
-        "analysis only",
-    ]) || [
-        "don't change",
-        "do not change",
-        "don't modify",
-        "do not modify",
-        "don't fix",
-        "do not fix",
-        "without modifying",
-        "without changing",
-    ]
-    .iter()
-    .any(|cue| {
-        text.match_indices(cue).any(|(at, _)| {
-            let rest = text[at + cue.len()..].trim_start();
-            rest.is_empty()
-                || rest.starts_with(['.', '!', ','])
-                || [
-                    "anything",
-                    "any files",
-                    "project files",
-                    "the project",
-                    "files",
-                    "it",
-                    "this",
-                ]
-                .iter()
-                .any(|scope| {
-                    rest.strip_prefix(scope).is_some_and(|tail| {
-                        tail.is_empty() || tail.starts_with(['.', '!', ',', ' '])
+    let readonly = contains(&["read-only review", "read-only analysis", "analysis only"])
+        || [
+            "no edits",
+            "no modifications",
+            "don't change",
+            "do not change",
+            "don't modify",
+            "do not modify",
+            "don't fix",
+            "do not fix",
+            "without modifying",
+            "without changing",
+        ]
+        .iter()
+        .any(|cue| {
+            text.match_indices(cue).any(|(at, _)| {
+                let rest = text[at + cue.len()..].trim_start();
+                rest.is_empty()
+                    || rest.starts_with(['.', '!', ','])
+                    || [
+                        "anything",
+                        "any files",
+                        "project files",
+                        "the project",
+                        "files",
+                        "it",
+                        "this",
+                    ]
+                    .iter()
+                    .any(|scope| {
+                        rest.strip_prefix(scope).is_some_and(|tail| {
+                            (tail.is_empty() || tail.starts_with(['.', '!', ',', ' ']))
+                                && !["except ", "other than ", "to ", "in "]
+                                    .iter()
+                                    .any(|prefix| tail.trim_start().starts_with(prefix))
+                        })
                     })
-                })
-        })
-    });
+            })
+        });
     let inspect = matches!(preset, "search" | "review" | "tests" | "lint" | "explain")
         || starts(&[
             "inspect ",
@@ -135,7 +135,7 @@ pub fn infer(
         }
     } else if action || followup {
         Intent::Execute
-    } else if conceptual {
+    } else if conceptual && !inspect {
         Intent::Converse
     } else if inspect
         || (prior.is_some_and(|p| p.intent != Intent::Converse)
@@ -208,9 +208,16 @@ pub fn conversation(prior: &Task) -> String {
 
 pub fn failure(error: &AppError) -> TaskFailure {
     let category = match error.code.as_str() {
-        "MODEL_MISSING" | "RUNTIME_UNAVAILABLE" | "MODEL_UNAVAILABLE" => "MODEL_UNAVAILABLE",
-        "MODEL_PROFILE_REQUIRED" | "MODEL_SETUP" => "MODEL_UNAVAILABLE",
-        "MODEL_LOAD_FAILED" => "MODEL_LOAD_FAILED",
+        "MODEL_MISSING"
+        | "RUNTIME_UNAVAILABLE"
+        | "MODEL_UNAVAILABLE"
+        | "MODEL_REQUIRED"
+        | "MODEL_CALIBRATION_REQUIRED"
+        | "MODEL_BUSY"
+        | "MODEL_VISION"
+        | "MODEL_PROFILE_REQUIRED"
+        | "MODEL_SETUP" => "MODEL_UNAVAILABLE",
+        "MODEL_LOAD_FAILED" | "MODEL_RELEASE" => "MODEL_LOAD_FAILED",
         "MODEL_RESPONSE_EMPTY" => "MODEL_RESPONSE_EMPTY",
         "INFERENCE_INTERRUPTED" => "STREAM_INTERRUPTED",
         "INFERENCE_PROTOCOL" => "MODEL_OUTPUT_INVALID",
@@ -336,20 +343,22 @@ pub fn legal_transition(from: &str, to: &str) -> bool {
     }
 }
 
-// Validation statistics must come from check records, never generated claims.
+// Drop validation claims without splitting on periods inside filenames.
 pub fn explanation(text: &str) -> String {
-    let sentences = text
-        .split_inclusive(['.', '\n'])
-        .filter(|s| {
-            let lower = s.to_lowercase();
+    let note = text
+        .split_inclusive('\n')
+        .flat_map(|line| line.split_inclusive(". "))
+        .filter(|sentence| {
+            let lower = sentence.to_lowercase();
             !["test", "passed", "failed", "check", "validated"]
                 .iter()
-                .any(|w| lower.contains(w))
+                .any(|word| lower.contains(word))
         })
         .collect::<String>();
-    if sentences.trim().is_empty() {
+    let note = security::bounded(&security::redact(note.trim()), 3000);
+    if note.is_empty() {
         String::new()
     } else {
-        format!("{}\n\n", security::bounded(sentences.trim(), 3000))
+        format!("\n\nModel explanation (unverified):\n{note}")
     }
 }
