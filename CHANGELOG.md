@@ -2,7 +2,25 @@
 
 Meaningful changes are grouped by application version, using Keep a Changelog-style sections. Earlier milestones are reconstructed from existing architecture/acceptance documents, not invented Git commits or tags. The first public source release is 0.3.0.
 
-## [Unreleased]
+## [0.4.0] - 2026-10-20
+
+### Added
+
+- Task-owned browser sessions with semantic references, stale-reference recovery, bounded navigation, tabs, diagnostics and viewport capture through the existing encrypted image path.
+- Browser-only workspaces with native rejection of project-file and host-command tools, static public retrieval without Chromium, and separate navigation/resource-origin review.
+- Native review of simple anonymous static form submissions and task-owned development-server startup/cleanup in private project copies.
+- Compact browser evidence in Activity, local continuation and offline handoff; selective initial screenshots for explicit visual requests.
+
+### Fixed
+
+- Reject extra fields on tagged unit browser actions, stale controls, sensitive query keys and private-network redirects without broadening permissions.
+- Mask password controls, block model interaction on authentication pages, and disable WebSocket/WebRTC/WebTransport paths and service workers.
+- Remove temporary browser HOME after supervised process exit and on interrupted-task recovery; refuse redirected cleanup paths while retaining encrypted evidence.
+
+### Verified
+
+- 108 native unit tests, eight local integration tests, the separately run external HTTPS browser test, 14 frontend tests, strict Clippy, production frontend build, native Apply/Undo and browser-workspace UI checks.
+- Real Fast public/Ukrainian/vision tasks and a Balanced browser-reproduce/edit/test/retest task on synthetic fixtures. Strong browser acceptance remains unproven because of the unchanged memory preflight. See [QA](docs/QA_0.4.0.md).
 
 ## [0.3.2] - 2026-10-19
 

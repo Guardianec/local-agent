@@ -51,6 +51,22 @@ pub struct Component {
     pub chromium_hash: String,
 }
 
+fn sensitive_query(url: &reqwest::Url) -> bool {
+    url.query_pairs().any(|(key, _)| {
+        matches!(
+            key.to_ascii_lowercase().replace(['-', '_'], "").as_str(),
+            "password"
+                | "passwd"
+                | "accesstoken"
+                | "token"
+                | "apikey"
+                | "authorization"
+                | "secret"
+                | "signature"
+                | "credential"
+        )
+    })
+}
 pub fn validate(spec: &BrowserSpec) -> Result<reqwest::Url> {
     let url = reqwest::Url::parse(&spec.url)
         .map_err(|_| AppError::new("BROWSER_URL", "Enter an HTTP or HTTPS page address."))?;
@@ -59,20 +75,27 @@ pub fn validate(spec: &BrowserSpec) -> Result<reqwest::Url> {
         || url.password().is_some()
         || spec.url.len() > 2048
         || security::has_secret(&spec.url)
+        || sensitive_query(&url)
     {
         return Err(AppError::new(
             "BROWSER_URL",
             "Credentials, sensitive query values and non-web addresses are blocked.",
         ));
     }
-    if !matches!(spec.profile.as_str(), "public_read" | "local_test") || spec.steps.len() > 10 {
+    if !matches!(
+        spec.profile.as_str(),
+        "public_read" | "public_web" | "local_read" | "local_test"
+    ) || spec.steps.len() > 10
+    {
         return Err(AppError::new(
             "BROWSER_SCOPE",
             "Choose a supported profile with at most 10 steps.",
         ));
     }
-    let ip = url.host_str().and_then(|h| h.parse::<IpAddr>().ok());
-    if spec.profile == "local_test"
+    let ip = url
+        .host_str()
+        .and_then(|h| h.trim_matches(['[', ']']).parse::<IpAddr>().ok());
+    if matches!(spec.profile.as_str(), "local_test" | "local_read")
         && !(url.host_str() == Some("localhost") || ip.is_some_and(|a| a.is_loopback()))
     {
         return Err(AppError::new(
@@ -80,7 +103,7 @@ pub fn validate(spec: &BrowserSpec) -> Result<reqwest::Url> {
             "Local tests must use an explicitly approved loopback server.",
         ));
     }
-    if spec.profile == "local_test"
+    if matches!(spec.profile.as_str(), "local_test" | "local_read")
         && matches!(
             url.port_or_known_default(),
             Some(11434 | 9222 | 9223 | 2375 | 2376)
@@ -104,7 +127,9 @@ pub fn validate(spec: &BrowserSpec) -> Result<reqwest::Url> {
                 "This browser step is unsupported or contains sensitive input.",
             ));
         }
-        if spec.profile == "public_read" && !step.action.starts_with("assert_") {
+        if matches!(spec.profile.as_str(), "public_read" | "public_web")
+            && !step.action.starts_with("assert_")
+        {
             return Err(AppError::new(
                 "BROWSER_READ_ONLY",
                 "Public pages support reading and assertions only.",
@@ -256,6 +281,15 @@ fn public_ip(ip: IpAddr) -> bool {
     }
 }
 
+pub(crate) fn task_folder(store: &Store, task_id: &str) -> Result<PathBuf> {
+    if task_id.len() != 36 || uuid::Uuid::parse_str(task_id).is_err() {
+        return Err(AppError::new(
+            "BROWSER_TASK",
+            "Invalid browser task identity; no temporary data was changed.",
+        ));
+    }
+    Ok(store.root.join("tasks").join(task_id).join("browser"))
+}
 pub async fn run(
     store: &Store,
     task_id: &str,
@@ -271,7 +305,7 @@ pub async fn run(
         .first_pipe_instance(true)
         .reject_remote_clients(true)
         .create(&pipe)?;
-    let folder = store.root.join("tasks").join(task_id).join("browser");
+    let folder = task_folder(store, task_id)?;
     std::fs::create_dir_all(folder.join("home"))?;
     let input = folder.join(format!("{}.json", id()));
     std::fs::write(
@@ -292,7 +326,7 @@ pub async fn run(
     let plan = CommandPlan {
         executable: PathBuf::from(&component.node),
         args: vec![component.helper, input.to_string_lossy().into()],
-        directory: folder,
+        directory: folder.clone(),
         environment: env,
         timeout: Duration::from_secs(120),
     };
@@ -354,20 +388,58 @@ pub async fn run(
     };
     tokio::pin!(broker);
     let result = tokio::select! {
-        done=&mut child=>{broker_cancel.cancel();done.map_err(|e|AppError::new("BROWSER_WORKER","The browser worker stopped.").detail(e))??},
-        done=&mut broker=>{if let Err(e)=done{run_cancel.cancel();let _=child.await;return Err(e);}child.await.map_err(|e|AppError::new("BROWSER_WORKER","The browser worker stopped.").detail(e))??}
+        done=&mut child=>{broker_cancel.cancel();done.map_err(|e|AppError::new("BROWSER_WORKER","The browser worker stopped.").detail(e)).and_then(|r|r)},
+        done=&mut broker=>{match done{Err(e)=>{run_cancel.cancel();let _=child.await;Err(e)},Ok(())=>child.await.map_err(|e|AppError::new("BROWSER_WORKER","The browser worker stopped.").detail(e)).and_then(|r|r)}}
     };
+    let _ = std::fs::remove_file(&input);
+    tokio::task::spawn_blocking(move || cleanup_home(&folder))
+        .await
+        .map_err(|e| {
+            AppError::new("BROWSER_CLEANUP", "Browser temporary data cleanup stopped.").detail(e)
+        })??;
+    let result = result?;
     let value: Value = serde_json::from_str(result.output.trim()).map_err(|_| {
         AppError::new("BROWSER_FAILED", "The browser could not finish its check.")
             .detail(security::bounded(&result.output, 2000))
     })?;
     Ok(value)
 }
-async fn fetch(
+pub(crate) fn cleanup_home(folder: &Path) -> Result<()> {
+    let root = crate::fs::ConfinedRoot::open(folder)?;
+    let home = root.path().join("home");
+    if !home.exists() {
+        return Ok(());
+    }
+    let handle = crate::platform::open_dir(&home)?;
+    crate::platform::ensure_ordinary(&handle)?;
+    drop(handle);
+    // Parent handles stay pinned; Rust's Windows removal does not follow links.
+    for attempt in 0..5 {
+        match std::fs::remove_dir_all(&home) {
+            Ok(())=>return Ok(()),
+            Err(error) if error.kind()==std::io::ErrorKind::NotFound=>return Ok(()),
+            Err(error) if attempt==4=>return Err(AppError::new("BROWSER_CLEANUP","Browser processes stopped, but their task-owned temporary profile could not be removed.").detail(error)),
+            Err(_)=>std::thread::sleep(Duration::from_millis(50)),
+        }
+    }
+    Ok(())
+}
+pub(crate) async fn fetch(
     request: &Value,
     origin: &str,
     spec: &BrowserSpec,
     cancel: &CancellationToken,
+) -> Result<Value> {
+    fetch_approved(request, origin, spec, cancel, false).await
+}
+
+/// `effect` is supplied only after native review of this exact request.
+pub(crate) async fn fetch_approved(
+    request: &Value,
+    origin: &str,
+    spec: &BrowserSpec,
+    cancel: &CancellationToken,
+    effect: bool,
 ) -> Result<Value> {
     let raw = request["url"]
         .as_str()
@@ -385,7 +457,7 @@ async fn fetch(
         ));
     }
     let method = request["method"].as_str().unwrap_or("GET");
-    if !matches!(method, "GET" | "HEAD") && spec.profile != "local_test" {
+    if !matches!(method, "GET" | "HEAD") && spec.profile != "local_test" && !effect {
         return Err(AppError::new(
             "BROWSER_EFFECT",
             "Public-page submissions are blocked.",
@@ -401,7 +473,11 @@ async fn fetch(
         ));
     }
     let body = request["body"].as_str().unwrap_or("");
-    if body.len() > 64 * 1024 || security::has_secret(body) || security::has_secret(raw) {
+    if body.len() > 64 * 1024
+        || security::has_secret(body)
+        || security::has_secret(raw)
+        || sensitive_query(&url)
+    {
         return Err(AppError::new(
             "BROWSER_SECRET",
             "Sensitive or oversized browser data was blocked.",
@@ -409,17 +485,28 @@ async fn fetch(
     }
     let host = url
         .host_str()
-        .ok_or_else(|| AppError::new("BROWSER_HOST", "Missing host."))?;
+        .ok_or_else(|| AppError::new("BROWSER_HOST", "Missing host."))?
+        .trim_matches(['[', ']']);
     let port = url.port_or_known_default().unwrap_or(443);
-    let addresses = tokio::time::timeout(
-        Duration::from_secs(5),
-        tokio::net::lookup_host((host, port)),
-    )
-    .await
-    .map_err(|_| AppError::new("BROWSER_DNS", "The page host did not resolve."))??
-    .collect::<Vec<_>>();
+    if matches!(spec.profile.as_str(), "public_read" | "public_web") && !matches!(port, 80 | 443) {
+        return Err(AppError::new(
+            "BROWSER_PORT",
+            "Public pages require standard HTTP or HTTPS ports.",
+        ));
+    }
+    let addresses = if let Ok(ip) = host.parse::<IpAddr>() {
+        vec![SocketAddr::new(ip, port)]
+    } else {
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            tokio::net::lookup_host((host, port)),
+        )
+        .await
+        .map_err(|_| AppError::new("BROWSER_DNS", "The page host did not resolve."))??
+        .collect::<Vec<_>>()
+    };
     let allowed = |a: &SocketAddr| {
-        if spec.profile == "local_test" {
+        if matches!(spec.profile.as_str(), "local_test" | "local_read") {
             a.ip().is_loopback()
         } else {
             public_ip(a.ip())
@@ -470,7 +557,14 @@ async fn fetch(
                     "The page returned an unsupported redirect.",
                 )
             })?;
-        if request["document"] != true || target.origin().ascii_serialization() != origin {
+        if request["document"] != true
+            || request["mainDocument"] == false
+            || target.origin().ascii_serialization() != origin
+            || !target.username().is_empty()
+            || target.password().is_some()
+            || security::has_secret(target.as_str())
+            || sensitive_query(&target)
+        {
             return Err(AppError::new("BROWSER_REDIRECT","Subresource or cross-origin redirect blocked. Open the final address in a new approved check."));
         }
         return Ok(json!({"redirect":target.as_str()}));
@@ -509,9 +603,66 @@ async fn fetch(
 mod tests {
     use super::*;
     #[test]
+    fn browser_profile_cleanup_refuses_a_redirected_home() {
+        let tmp = tempfile::tempdir().unwrap();
+        let browser = tmp.path().join("browser");
+        let outside = tmp.path().join("outside");
+        std::fs::create_dir(&browser).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        std::fs::write(outside.join("keep.txt"), b"preserve").unwrap();
+        let home = browser.join("home");
+        let status = std::process::Command::new("cmd.exe")
+            .args(["/D", "/C", "mklink", "/J"])
+            .arg(&home)
+            .arg(&outside)
+            .output()
+            .unwrap();
+        assert!(
+            status.status.success(),
+            "Could not create the disposable junction fixture"
+        );
+        assert!(cleanup_home(&browser).is_err());
+        assert_eq!(
+            std::fs::read(outside.join("keep.txt")).unwrap(),
+            b"preserve"
+        );
+        std::fs::remove_dir(home).unwrap();
+    }
+    #[tokio::test]
+    async fn approved_external_effect_does_not_bypass_private_network_policy() {
+        let spec = BrowserSpec {
+            url: "http://127.0.0.1/".into(),
+            profile: "public_read".into(),
+            steps: vec![],
+        };
+        let request = json!({"url":spec.url,"method":"POST","body":"name=example","document":true});
+        let error = fetch_approved(
+            &request,
+            "http://127.0.0.1",
+            &spec,
+            &CancellationToken::new(),
+            true,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, "BROWSER_ADDRESS");
+        let error = fetch_approved(
+            &request,
+            "http://127.0.0.1",
+            &spec,
+            &CancellationToken::new(),
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, "BROWSER_EFFECT");
+    }
+    #[test]
     fn rejects_sensitive_origins_and_actions() {
         for url in [
             "file:///C:/secret",
+            "http://localhost:3000/?pass%77ord=x",
+            "http://localhost:3000/?access_token=x",
             "http://127.0.0.1:11434",
             "http://localhost:9223",
         ] {
@@ -527,6 +678,15 @@ mod tests {
         assert!(!public_ip("169.254.169.254".parse().unwrap()));
         assert!(public_ip("1.1.1.1".parse().unwrap()));
         for ip in [
+            "10.0.0.1",
+            "172.16.0.1",
+            "192.168.0.1",
+            "100.64.0.1",
+            "198.18.0.1",
+            "::1",
+            "fc00::1",
+            "fe80::1",
+            "ff02::1",
             "192.0.2.1",
             "198.51.100.1",
             "203.0.113.1",

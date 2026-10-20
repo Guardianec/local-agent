@@ -35,7 +35,7 @@ if (binaryIndex !== -1) {
     if (statSync(name).size > 2 * 1024 * 1024) fail(name, 'unexpected large source asset');
     const bytes = readFileSync(name);
     if (bytes.subarray(0, 8192).includes(0)) {
-      if (!/^src-tauri\/icons\/.*\.(?:png|ico|icns)$/.test(name) && name !== 'docs/images/workspace-review.png') fail(name, 'unexpected binary in source');
+      if (!/^src-tauri\/icons\/.*\.(?:png|ico|icns)$/.test(name) && !['docs/images/workspace-review.png', 'docs/images/browser-verification.png'].includes(name)) fail(name, 'unexpected binary in source');
       continue;
     }
     const text = bytes.toString('utf8');

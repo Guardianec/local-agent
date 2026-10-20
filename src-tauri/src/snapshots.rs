@@ -564,6 +564,7 @@ mod tests {
         std::fs::write(original.path().join("a.txt"), b"user dirty\r\n").unwrap();
         let root = ConfinedRoot::open(original.path()).unwrap();
         let p = Project {
+            browser_only: false,
             id: id(),
             name: "test".into(),
             path: original.path().to_string_lossy().into(),

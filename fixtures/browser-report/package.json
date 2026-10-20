@@ -1,0 +1,5 @@
+{
+  "name": "synthetic-browser-report",
+  "private": true,
+  "scripts": { "dev": "node server.cjs", "test": "node --test" }
+}

@@ -1,12 +1,22 @@
 # Local Agent
 
+**0.4.0 — Browser & Web Operator:** read public pages, inspect disposable local apps, and verify a website repair in the same task. [Supported actions and boundaries](docs/BROWSER_OPERATOR.md) · [Measured QA and limits](docs/QA_0.4.0.md).
+
 A Windows desktop application for bounded coding tasks using models running on your own PC. Describe a task, inspect the agent's activity, review a diff, and explicitly apply or undo the changes.
 
 Built with Tauri 2, React, TypeScript and Rust. Inference uses Ollama's local API. This is an early, Windows-first developer tool for repetitive work; difficult tasks can be packaged for a cloud coding agent without uploading anything automatically.
 
 [Download Windows installer](https://github.com/Guardianec/local-agent/releases/latest) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md) · [Development history](docs/DEVELOPMENT_HISTORY.md) · [Contributing](CONTRIBUTING.md)
 
-## 0.3.2 stabilization
+## 0.4.0 browser and web operation
+
+Choose **Browser tasks** without opening a repository, or work in a project's private task copy to reproduce and repair a web bug. Anonymous static retrieval needs no Chromium. Optional isolated Chromium adds semantic controls, tabs, diagnostics and selective screenshots using the existing encrypted image storage. Approved development servers live with the task and stop before it finishes. Simple static public submissions require a separate review of the exact request; downloads, uploads and persistent sign-in remain deferred.
+
+The real Balanced-model fixture reproduced an HTTP 500, fixed one source file, passed its test and verified the repaired page. Fast passed public text, Ukrainian and canvas-image tasks. These small cases do not establish general reliability; Strong browser work was blocked by the unchanged RAM gate. See [the reproducible QA record](docs/QA_0.4.0.md).
+
+![Actual synthetic browser repair with captured page evidence and closed session](docs/images/browser-verification.png)
+
+## Earlier 0.3.2 stabilization
 
 Auto / Ask / Act lets you talk normally, inspect without authorizing edits, or perform requested work. Answers are preserved, follow-ups retain compact context, and failures/cancellation produce visible results with Retry, offline Codex handoff and sanitized diagnostics. This update also corrects named-file question routing, scoped edit constraints, model setup failure categories and final explanation formatting. See the [stabilization contract](docs/decisions/005-conversational-outcomes.md) and [v0.3.2 QA report](docs/QA_0.3.2.md).
 
@@ -20,7 +30,7 @@ Auto / Ask / Act lets you talk normally, inspect without authorizing edits, or p
 - Accept screenshots through a picker, paste or drag-and-drop, with previews and removal.
 - Produce an offline **Prepare for Codex** package with selected findings, checks and changes.
 - Run deterministic search/checks without loading a model.
-- Optionally run bounded Playwright scenarios against an explicitly approved origin, without personal browser profiles.
+- Read public web text, run scoped semantic browser tasks, and verify disposable development apps without personal browser profiles.
 
 ![Local Agent reviewing an image-guided CSS change](docs/images/workspace-review.png)
 
@@ -76,7 +86,7 @@ Strong checks memory before loading and watches for sustained RAM pressure. Load
 
 ## Install
 
-1. Download `Local-Agent_0.3.2_x64-setup.exe` from the [v0.3.2 release](https://github.com/Guardianec/local-agent/releases/tag/v0.3.2).
+1. Download `Local-Agent_0.4.0_x64-setup.exe` from the [v0.4.0 release](https://github.com/Guardianec/local-agent/releases/tag/v0.4.0).
 2. Optionally compare SHA-256 with the release's `SHA256SUMS` to verify the download.
 3. Run the per-user installer and open **Local Agent** from Start.
 4. Install/open Ollama separately. In **Auto routing → Local models**, install desired tiers, check tool compatibility and run **Test coding**. Enable Strong after its matching benchmark passes.

@@ -6,4 +6,6 @@ Major components: Tauri (MIT/Apache-2.0), React (MIT), TypeScript (Apache-2.0), 
 
 The packaged optional helper retains dependency license/notice files. Separately downloaded Chromium retains its notices. WebView2, Node.js, Ollama and selected model weights are separately installed/downloaded and retain their licenses. Review official model cards before redistribution or license-sensitive use.
 
+Static HTML retrieval uses the [html5ever tokenizer](https://github.com/servo/html5ever), licensed MIT OR Apache-2.0. Its version is pinned in Cargo.lock.
+
 Default references: [Fast](https://ollama.com/library/qwen3.5:4b-q8_0), [Balanced](https://ollama.com/library/qwen3.5:9b-q4_K_M), [Strong](https://ollama.com/library/qwen3.6:35b-a3b-q4_K_M). No model weights are included in source or installer.

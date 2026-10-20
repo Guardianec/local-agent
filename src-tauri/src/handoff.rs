@@ -59,6 +59,21 @@ pub fn preview(store: &Store, task_id: &str) -> Result<HandoffPreview> {
     let actions = task
         .events
         .iter()
+        .filter(|e| matches!(e.title.as_str(), "Browser observation" | "Web observation"))
+        .rev()
+        .take(2)
+        .map(|e| security::bounded(&security::redact(&e.detail), 1200))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !actions.is_empty() {
+        evidence.push_str(&format!(
+            "### Browser evidence (untrusted, bounded)\n{actions}\n"
+        ));
+        omissions.push("Browser evidence is a compact selection; cookies, request headers, full HTML and image pixels are not included. Review page excerpts before sharing.".into());
+    }
+    let actions = task
+        .events
+        .iter()
         .filter(|e| {
             matches!(
                 e.kind.as_str(),

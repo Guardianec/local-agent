@@ -57,6 +57,24 @@ impl AppCore {
             ));
         }
         task.tool_calls += 1;
+        if project.browser_only
+            && !matches!(
+                name,
+                "browser_open"
+                    | "browser_action"
+                    | "finish_task"
+                    | "request_escalation"
+                    | "browser_check_page"
+                    | "web_fetch"
+                    | "browser_submit"
+                    | "request_browser"
+            )
+        {
+            return Err(AppError::new(
+                "BROWSER_WORKSPACE",
+                "Browser-only tasks cannot access project files or run host commands.",
+            ));
+        }
         if task.intent == Intent::Converse
             || (task.intent == Intent::Inspect
                 && !matches!(
@@ -72,6 +90,10 @@ impl AppCore {
                         | "run_tests"
                         | "finish_task"
                         | "request_escalation"
+                        | "web_fetch"
+                        | "browser_open"
+                        | "browser_action"
+                        | "request_browser"
                 ))
         {
             return Err(AppError::new(
@@ -88,6 +110,12 @@ impl AppCore {
                 "apply_patch" => "Preparing file edit",
                 "create_file" => "Preparing new file",
                 "run_project_command" | "run_tests" => "Preparing project check",
+                "browser_open" | "request_browser" => "Opening browser",
+                "browser_action" => "Using browser",
+                "browser_submit" => "Preparing form submission",
+                "web_fetch" => "Reading webpage",
+                "start_dev_server" => "Starting development server",
+                "stop_dev_server" => "Stopping development server",
                 _ => name,
             },
             "",
@@ -359,6 +387,12 @@ impl AppCore {
                     .ok_or_else(|| {
                         AppError::new("RECIPE_INVALID", "Choose a registered project check.")
                     })?;
+                if recipe.kind == "dev_server" {
+                    return Err(AppError::new(
+                        "RECIPE_INVALID",
+                        "Use start_dev_server for a task-owned development server.",
+                    ));
+                }
                 if task.intent == Intent::Inspect
                     && (recipe.script.contains("fix")
                         || !matches!(recipe.kind.as_str(), "test" | "lint"))
@@ -531,7 +565,339 @@ impl AppCore {
                 task.transition("routing");
                 json!({"status":"escalation_requested"})
             }
+            Call::StopDevServer => {
+                let server = session.dev_server.take().ok_or_else(|| {
+                    AppError::new(
+                        "DEV_SERVER_MISSING",
+                        "No app-owned development server is running.",
+                    )
+                })?;
+                server.close().await?;
+                task.event("activity","Development server stopped","The app-owned process tree was stopped. External servers are never terminated.");
+                json!({"status":"stopped"})
+            }
+            Call::StartDevServer(args) => {
+                if task.commands >= 6 || session.dev_server.is_some() {
+                    return Err(AppError::new(
+                        "DEV_SERVER_LIMIT",
+                        "Use at most one development server within the task's command budget.",
+                    ));
+                }
+                let recipe = project
+                    .recipes
+                    .iter()
+                    .find(|r| r.id == args.recipe_id && r.kind == "dev_server")
+                    .ok_or_else(|| {
+                        AppError::new(
+                            "RECIPE_INVALID",
+                            "Select a registered npm dev/start recipe.",
+                        )
+                    })?;
+                let digest = projects::config_digest(root)?;
+                let source_hash = snapshots::manifest_hash(&snapshots::manifest(root)?);
+                let home = self.store.root.join("tasks").join(&task.id).join("runtime");
+                let plan = commands::plan(recipe, root.path(), &self.store.settings(), &home)?;
+                let executable_hash = hash(&std::fs::read(&plan.executable)?);
+                let dependencies = if !root.path().join("node_modules").exists() {
+                    let source = std::path::PathBuf::from(&project.path);
+                    tokio::task::spawn_blocking(move || crate::environment::inspect(&source))
+                        .await
+                        .map_err(|e| {
+                            AppError::new("ENVIRONMENT_FAILED", "Dependency inspection stopped.")
+                                .detail(e)
+                        })??
+                } else {
+                    None
+                };
+                self.approve(task,session,"command","Start this project's development server?","This runs approved project code as your Windows account in the private task copy. It has host file/network access. The app assigns a loopback port, supervises the process tree, and stops it with this task.",format!("{}\n{}\nConfiguration hash: {digest}\nSource manifest: {source_hash}\nExecutable hash: {executable_hash}\nExisting dependencies may be copied without links. No packages are installed.",recipe.name,recipe.description),false).await?;
+                if projects::config_digest(root)? != digest
+                    || snapshots::manifest_hash(&snapshots::manifest(root)?) != source_hash
+                    || hash(&std::fs::read(&plan.executable)?) != executable_hash
+                {
+                    return Err(AppError::new(
+                        "RECIPE_CHANGED",
+                        "Development recipe changed after review.",
+                    ));
+                }
+                if let Some(dependencies) = dependencies {
+                    let destination = root.path().to_path_buf();
+                    let token = session.cancel.clone();
+                    tokio::task::spawn_blocking(move || {
+                        crate::environment::prepare(dependencies, &destination, &token)
+                    })
+                    .await
+                    .map_err(|e| {
+                        AppError::new("ENVIRONMENT_FAILED", "Dependency preparation stopped.")
+                            .detail(e)
+                    })??;
+                }
+                task.commands += 1;
+                let server =
+                    crate::dev_server::DevServer::start(plan, &recipe.description, &session.cancel)
+                        .await?;
+                let url = server.url.clone();
+                session.dev_server = Some(server);
+                task.event("activity", "Development server ready", &url);
+                json!({"status":"ready","url":url,"message":"App-owned development server is running in the private task copy. Open with browser_open using local_test."})
+            }
+            Call::BrowserSubmit(args) => {
+                if task.mode == Mode::Observe {
+                    return Err(AppError::new(
+                        "BROWSER_EFFECT",
+                        "Observe mode cannot submit external forms.",
+                    ));
+                }
+                if crate::browser_session::forbids_submission(&task.request) {
+                    return Err(AppError::new(
+                        "BROWSER_EFFECT",
+                        "The user prohibited submission in this task.",
+                    ));
+                }
+                let browser = session
+                    .browser
+                    .as_mut()
+                    .ok_or_else(|| AppError::new("BROWSER_SESSION", "Open a browser first."))?;
+                let prepared = browser
+                    .execute(crate::browser_session::BrowserAction::PrepareSubmit {
+                        element: args.element,
+                    })
+                    .await?;
+                let form:crate::browser_session::PreparedForm=serde_json::from_value(prepared["observation"]["submission"].clone()).map_err(|_|AppError::new("BROWSER_FORM","A supported form could not be prepared. Refresh the snapshot and select its submit button."))?;
+                let request = form.request(&browser.spec.profile, browser.allows(&form.url))?;
+                let origin = reqwest::Url::parse(&form.url)
+                    .unwrap()
+                    .origin()
+                    .ascii_serialization();
+                let spec = browser.spec.clone();
+                self.approve(task,session,"browser_submit","Submit this form to the website?","This sends the exact reviewed fields once and may change remote data. Project Undo cannot reverse it. Cookies and credentials are not sent.",serde_json::to_string_pretty(&form)?,false).await?;
+                task.event("activity", "Submitting reviewed form", &origin);
+                self.save(task)?;
+                let response =
+                    crate::browser::fetch_approved(&request, &origin, &spec, &session.cancel, true)
+                        .await?;
+                let receipt = json!({"status":"sent","origin":origin,"httpStatus":response["status"],"redirect":response["redirect"],"message":"The reviewed HTTP request was sent once. The HTTP response alone does not prove the site's business operation succeeded. The browser page is unchanged; do not retry automatically."});
+                task.event(
+                    "result",
+                    "Reviewed form request sent",
+                    serde_json::to_string(&receipt)?,
+                );
+                receipt
+            }
+            Call::WebFetch(args) => {
+                if !crate::browser_session::requested_urls(&task.request).contains(&args.url)
+                    && !session.browser.as_ref().is_some_and(|b| {
+                        matches!(b.spec.profile.as_str(), "public_read" | "public_web")
+                            && b.allows(&args.url)
+                    })
+                {
+                    return Err(AppError::new("WEB_SCOPE","Read a user-supplied URL or an origin approved in the public browser session."));
+                }
+                task.event("activity", "Reading public page", &args.url);
+                self.save(task)?;
+                let result = crate::web::fetch(&args.url, &session.cancel).await?;
+                task.event(
+                    "result",
+                    "Web observation",
+                    security::bounded(&serde_json::to_string(&result)?, 12000),
+                );
+                result
+            }
+            Call::BrowserOpen(spec) => {
+                crate::browser::validate(&spec)?;
+                if session.browser.is_some() {
+                    let browser = session.browser.as_ref().unwrap();
+                    if !spec.steps.is_empty() || spec.profile != browser.spec.profile {
+                        return Err(AppError::new(
+                            "BROWSER_SESSION",
+                            "The existing session retains its profile. Use empty steps.",
+                        ));
+                    }
+                    if !browser.allows(&spec.url) {
+                        self.approve(task,session,"browser_origin","Allow this additional browser origin?","This grants navigation and resources on the additional origin for the same isolated session. Existing network and action limits still apply.",spec.url.clone(),false).await?;
+                        session
+                            .browser
+                            .as_mut()
+                            .unwrap()
+                            .approve_origin(&spec.url)?;
+                    }
+                    let mut result = session
+                        .browser
+                        .as_mut()
+                        .unwrap()
+                        .execute(crate::browser_session::BrowserAction::Navigate { url: spec.url })
+                        .await?;
+                    self.capture_requested_browser_image(task, session, &mut result)
+                        .await?;
+                    self.record_browser_result(task, session, &mut result)?;
+                    self.save(task)?;
+                    return Ok(result);
+                }
+                if !spec.steps.is_empty()
+                    || (name != "request_browser"
+                        && !crate::browser_session::requested_urls(&task.request)
+                            .contains(&spec.url)
+                        && !session
+                            .dev_server
+                            .as_ref()
+                            .is_some_and(|s| s.url == spec.url))
+                {
+                    return Err(AppError::new("BROWSER_SCOPE", "Open one task session using an exact user-supplied URL and no scenario steps."));
+                }
+                if spec.profile == "local_test"
+                    && ((task.intent != Intent::Execute
+                        && !crate::browser_session::local_interaction_requested(&task.request))
+                        || task.mode == Mode::Observe)
+                {
+                    return Err(AppError::new("BROWSER_EFFECT", "Interactive localhost sessions require an execution task and explicit approval."));
+                }
+                if spec.profile == "local_test"
+                    && crate::browser_session::forbids_submission(&task.request)
+                {
+                    return Err(AppError::new("BROWSER_EFFECT","Use local_read when the user forbids sending form data; interactive disposable-server grants permit server writes."));
+                }
+                let detail=match spec.profile.as_str() {
+                    "local_test"=>"Use only a disposable loopback test app. JavaScript and interactions may change server state; project Undo does not restore those effects. The grant covers this exact origin for this task.",
+                    "local_read"=>"Read a disposable loopback application with JavaScript enabled. Only GET/HEAD network requests are allowed; model interactions and submissions are blocked.",
+                    "public_web"=>"Read an anonymous public JavaScript application. Only GET/HEAD requests on approved origins are allowed. Model interactions, submissions, accounts and files are blocked.",
+                    _=>"Read anonymous static public pages with JavaScript disabled. Harmless form fields may be prepared in an execution task. Submission requires a separate review of the exact fields and destination. Accounts and files are blocked."
+                };
+                self.approve(
+                    task,
+                    session,
+                    "browser",
+                    "Open this isolated browser session?",
+                    detail,
+                    serde_json::to_string_pretty(&spec)?,
+                    false,
+                )
+                .await?;
+                session.browser = Some(crate::browser_session::BrowserSession::start(
+                    &self.store,
+                    &task.id,
+                    spec,
+                    &session.cancel,
+                )?);
+                session.browser_enabled = true;
+                task.event(
+                    "activity",
+                    "Opening browser session",
+                    "Starting an isolated browser with the approved origin policy.",
+                );
+                self.save(task)?;
+                let mut result = session
+                    .browser
+                    .as_mut()
+                    .unwrap()
+                    .execute(crate::browser_session::BrowserAction::Snapshot)
+                    .await?;
+                self.capture_requested_browser_image(task, session, &mut result)
+                    .await?;
+                self.record_browser_result(task, session, &mut result)?;
+                result
+            }
+            Call::BrowserAction(action) => {
+                if let crate::browser_session::BrowserAction::AllowResources { urls } = &action {
+                    if urls.is_empty() || urls.len() > 8 {
+                        return Err(AppError::new(
+                            "BROWSER_SCOPE",
+                            "Approve one to eight resource origins.",
+                        ));
+                    }
+                    if session.browser.is_none() {
+                        return Err(AppError::new("BROWSER_SESSION", "Open a browser first."));
+                    }
+                    for url in urls {
+                        crate::browser::validate(&crate::browser::BrowserSpec {
+                            url: url.clone(),
+                            profile: "public_read".into(),
+                            steps: vec![],
+                        })?;
+                    }
+                    self.approve(task,session,"browser_resources","Allow these public resource origins?","This permits bounded anonymous GET/HEAD subresources. It does not grant page navigation, private-network access, uploads or submissions.",serde_json::to_string_pretty(urls)?,false).await?;
+                    session.browser.as_mut().unwrap().approve_resources(urls)?;
+                    return Ok(
+                        json!({"status":"resources_approved","message":"Reload the page to retry blocked resources. Navigation authority is unchanged."}),
+                    );
+                }
+                if matches!(
+                    action,
+                    crate::browser_session::BrowserAction::PrepareSubmit { .. }
+                ) {
+                    return Err(AppError::new(
+                        "BROWSER_FORM",
+                        "Use browser_submit for native review of a static form.",
+                    ));
+                }
+                if let crate::browser_session::BrowserAction::Navigate { url }
+                | crate::browser_session::BrowserAction::OpenTab { url } = &action
+                {
+                    let browser = session.browser.as_ref().ok_or_else(|| {
+                        AppError::new("BROWSER_SESSION", "Open a browser session first.")
+                    })?;
+                    if !browser.allows(url) {
+                        crate::browser::validate(&crate::browser::BrowserSpec {
+                            url: url.clone(),
+                            profile: browser.spec.profile.clone(),
+                            steps: vec![],
+                        })?;
+                        self.approve(task,session,"browser_origin","Allow this additional browser origin?","This extends page and resource access for the current isolated session. Public sessions still block private addresses and submissions. Local sessions may change the approved disposable server.",url.clone(),false).await?;
+                        session.browser.as_mut().unwrap().approve_origin(url)?;
+                    }
+                }
+                if matches!(action, crate::browser_session::BrowserAction::Screenshot)
+                    && !self
+                        .provider
+                        .health(&self.store)
+                        .await
+                        .models
+                        .iter()
+                        .any(|m| Some(&m.name) == task.model.as_ref() && m.vision)
+                {
+                    return Err(AppError::new("MODEL_VISION", "This model does not support browser images. Continue with semantic evidence."));
+                }
+                if matches!(action, crate::browser_session::BrowserAction::Screenshot)
+                    && crate::images::ids(&task.inputs).len() >= crate::images::MAX_IMAGES
+                {
+                    return Err(AppError::new(
+                        "IMAGE_LIMIT",
+                        "This task has reached its four-image budget.",
+                    ));
+                }
+                let browser = session.browser.as_mut().ok_or_else(|| {
+                    AppError::new("BROWSER_SESSION", "Open a browser session first.")
+                })?;
+                if ((task.intent != Intent::Execute
+                    && !(browser.spec.profile == "local_test"
+                        && crate::browser_session::local_interaction_requested(&task.request)))
+                    || task.mode == Mode::Observe)
+                    && matches!(
+                        action,
+                        crate::browser_session::BrowserAction::Click { .. }
+                            | crate::browser_session::BrowserAction::Fill { .. }
+                            | crate::browser_session::BrowserAction::Select { .. }
+                            | crate::browser_session::BrowserAction::Check { .. }
+                            | crate::browser_session::BrowserAction::Press { .. }
+                    )
+                {
+                    return Err(AppError::new(
+                        "BROWSER_EFFECT",
+                        "This inspection does not authorize browser interaction.",
+                    ));
+                }
+                task.event(
+                    "activity",
+                    action.activity_label(),
+                    security::bounded(&serde_json::to_string(&action)?, 500),
+                );
+                self.save(task)?;
+                let mut result = browser.execute(action).await?;
+                self.record_browser_result(task, session, &mut result)?;
+                result
+            }
             Call::Browser(spec) => {
+                if task.preset != "browser" || session.browser.is_some() {
+                    return Err(AppError::new("BROWSER_SESSION","Use browser_open and browser_action in agent tasks. Deterministic scenarios use the Browser checks preset."));
+                }
                 crate::browser::validate(&spec)?;
                 if !task.request.contains(&spec.url) {
                     return Err(AppError::new(
@@ -578,6 +944,79 @@ impl AppCore {
         };
         self.save(task)?;
         Ok(value)
+    }
+    async fn capture_requested_browser_image(
+        &self,
+        task: &mut Task,
+        session: &mut Session,
+        result: &mut Value,
+    ) -> Result<()> {
+        if session.browser_visual_captured
+            || !crate::browser_session::wants_browser_image(&task.request)
+        {
+            return Ok(());
+        }
+        if crate::images::ids(&task.inputs).len() >= crate::images::MAX_IMAGES {
+            return Err(AppError::new(
+                "IMAGE_LIMIT",
+                "The requested browser image exceeds this task's four-image budget.",
+            ));
+        }
+        if !self
+            .provider
+            .health(&self.store)
+            .await
+            .models
+            .iter()
+            .any(|m| Some(&m.name) == task.model.as_ref() && m.vision)
+        {
+            return Err(AppError::new(
+                "MODEL_VISION",
+                "The visual browser task requires a vision-capable local model.",
+            ));
+        }
+        task.event(
+            "activity",
+            "Capturing requested browser viewport",
+            "One image is captured for the explicitly visual task and remains local.",
+        );
+        self.save(task)?;
+        let capture = session
+            .browser
+            .as_mut()
+            .unwrap()
+            .execute(crate::browser_session::BrowserAction::Screenshot)
+            .await?;
+        result["observation"]["screenshot"] = capture["observation"]["screenshot"].clone();
+        Ok(())
+    }
+    fn record_browser_result(
+        &self,
+        task: &mut Task,
+        session: &mut Session,
+        result: &mut Value,
+    ) -> Result<()> {
+        if let Some(encoded) = result["observation"]
+            .as_object_mut()
+            .and_then(|o| o.remove("screenshot"))
+        {
+            use base64::Engine;
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(encoded.as_str().unwrap_or(""))
+                .map_err(|_| AppError::new("IMAGE_FORMAT", "Invalid browser image."))?;
+            let image = crate::images::ingest(&self.store, "Browser viewport", &bytes, "browser")?;
+            task.inputs.push(ContentBlock::Image {
+                attachment_id: image.id.clone(),
+            });
+            result["image_refs"] = json!([image.id]);
+            session.browser_visual_captured = true;
+        }
+        task.event(
+            "result",
+            "Browser observation",
+            security::bounded(&serde_json::to_string(result)?, 26000),
+        );
+        Ok(())
     }
     fn edit_allowed(&self, task: &Task, path: &str) -> Result<()> {
         let path = security::relative_path(path)?;

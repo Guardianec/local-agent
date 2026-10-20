@@ -1,5 +1,19 @@
 # Development history
 
+## 0.4.0 browser operator — 2026-10-19–20
+
+Inspected and ran the existing 0.3.2 app before extending its helper. Baseline frontend suite passed 13 tests; two existing browser integrations passed, with external HTTPS intentionally ignored. The disposable desktop smoke passed exact-byte Apply/Undo, command approval/failure evidence, deterministic search and sensitive-scope handoff.
+
+Added a task-lived browser protocol over the existing nonce-authenticated named pipe and Windows Job executor, semantic references, stale recovery, tabs, diagnostics, screenshot ingestion, projectless browser workspaces, static retrieval, origin grants, reviewed static forms and development-server ownership. Existing Rust authority, private-copy review and model escalation remain in place; see decision 006.
+
+The final native pass completed 108 unit tests and eight local integration tests; the separately enabled external HTTPS test also passed. Fourteen frontend tests, strict Clippy and production frontend build passed. Native desktop QA retained exact-byte Apply/Undo, approval/failure evidence, search and handoff. Browser-only workspace and completed evidence UI checks passed. Canonical-field validation fixed extra-field acceptance on Serde tagged unit actions. Password observation/masking, WebRTC/WebTransport blocking, static-form checkbox safety and sensitive-query rejection gained regression coverage.
+
+Real Fast completed static public text, Ukrainian browser reading and screenshot/canvas interpretation. Final Balanced reproduced HTTP 500, edited only the intended source, passed the fixture test and verified the repaired page in 51.06 seconds with 13 tools. Initial model failures informed compact schemas, same-session navigation and selective initial visual capture. Strong passed an 8K coding calibration, but browser acceptance remained blocked by the unchanged available-RAM gate; no Strong browser success is claimed. [QA 0.4.0](QA_0.4.0.md) distinguishes real models from mock-inference escalation coverage and records deferrals.
+
+Acceptance inspection found browser HOME caches surviving process termination. Added confined cleanup after process exit and during interrupted-task reconciliation, preserving encrypted evidence and refusing junctions. Existing completed caches are not retroactively deleted. Reviewed an actual synthetic desktop screenshot for the README; no private task records or logs are included. All application manifests and lockfiles align at 0.4.0; helper version remains independent. Publication is gated on the clean committed production installer and exact downloaded checksum, not the debug QA build.
+
+Headroom was attempted; its configured local proxy was unreachable. Focused reads were used. No automatic traffic compression is claimed.
+
 This journal records engineering milestones, not a fictional commit history. The source checkout had no commits or remote before public-release preparation. Earlier versions are reconstructed from the architecture handoff, implementation decisions, acceptance notes and calibration records. Dates are given only where supported. The initial public Git commit imports 0.3.0; old tags/releases are not fabricated.
 
 ## Architecture and 0.1.0 — documented 2026-10-16

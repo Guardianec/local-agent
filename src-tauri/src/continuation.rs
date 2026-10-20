@@ -73,6 +73,14 @@ pub fn capture(
     observations.extend(
         task.events
             .iter()
+            .rev()
+            .filter(|e| matches!(e.title.as_str(), "Browser observation" | "Web observation"))
+            .take(2)
+            .map(|e| security::bounded(&security::redact(&e.detail), 1800)),
+    );
+    observations.extend(
+        task.events
+            .iter()
             .filter(|e| e.kind == "warning")
             .rev()
             .take(4)

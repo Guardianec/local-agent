@@ -1,4 +1,10 @@
-# Local Agent 0.3 architecture
+# Local Agent architecture
+
+## 0.4.0 browser operator
+
+`browser_session.rs` owns the task-lived typed transport, origin grants, bounded operations and cleanup over the existing helper/Job boundary. `browser.rs` remains the Rust HTTP/DNS/IP authority and retains deterministic scenarios. `web.rs` uses that broker for anonymous static retrieval without Chromium. `dev_server.rs` supervises approved development scripts in the task copy. The existing agent Session survives local tier escalation and is closed before terminal publication.
+
+Browser-only workspaces use an additive defaulted Project field and reject project/host tools at dispatch. Screenshots reuse `images.rs`; compact observations reuse task events, continuation and offline handoff. Navigation grants differ from public resource grants. Static form submission is a separate exact-request approval. Task termination awaits browser/server cleanup and removes temporary browser HOME; interrupted-task reconciliation repeats profile cleanup. See [decision 006](docs/decisions/006-browser-operator.md), [supported boundaries](docs/BROWSER_OPERATOR.md) and [QA](docs/QA_0.4.0.md).
 
 The Windows application remains Tauri 2, React/TypeScript and a Rust authority core, using Ollama's native loopback API. [HANDOFF.md](HANDOFF.md) is the original baseline; [decision 003](docs/decisions/003-multimodal-continuation.md) supersedes its model, context and escalation rules. It does not replace the filesystem, permission, snapshot or process boundaries.
 
@@ -41,7 +47,7 @@ Additive task fields use Serde defaults: structured inputs, frozen escalation pr
 
 An in-task tier transition keeps the same task ID, snapshot, working files, check records, grants, denied operations and remaining limits. An explicit **Continue task** remains a new user-started task, as before. On restart, interrupted tasks do not resume commands or approvals automatically.
 
-There is no cloud inference, cloud model subscription, automatic external image transmission, new browser operator, desktop controller, MCP ecosystem or background autonomy in this update.
+The original 0.3 update introduced no cloud inference, cloud model subscription, automatic external image transmission, browser operator, desktop controller, MCP ecosystem or background autonomy. The browser operator was added in 0.4 as described above.
 
 ## 0.3.1 stabilization
 

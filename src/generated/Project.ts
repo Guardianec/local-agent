@@ -4,4 +4,4 @@ import type { Mode } from "./Mode";
 import type { Recipe } from "./Recipe";
 import type { RootIdentity } from "./RootIdentity";
 
-export type Project = { id: string, name: string, path: string, identity: RootIdentity, stack: string, mode: Mode, revision: number, openedAt: string, files: Array<string>, exclusions: Array<string>, git: GitInfo | null, recipes: Array<Recipe>, };
+export type Project = { browserOnly: boolean, id: string, name: string, path: string, identity: RootIdentity, stack: string, mode: Mode, revision: number, openedAt: string, files: Array<string>, exclusions: Array<string>, git: GitInfo | null, recipes: Array<Recipe>, };

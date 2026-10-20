@@ -3,6 +3,156 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test]
+async fn interrupted_browser_profile_is_removed_without_removing_evidence() {
+    let tmp = tempfile::tempdir().unwrap();
+    let data = tmp.path().join("data");
+    let core = AppCore::open(&data).unwrap();
+    let project = core.browser_workspace().unwrap();
+    let started = core
+        .start(
+            &project.id,
+            "Prepare for Codex",
+            "handoff",
+            None,
+            Mode::Assisted,
+            None,
+        )
+        .unwrap();
+    let mut task = finish(&core, &started.id, false).await;
+    let folder = data.join("tasks").join(&task.id);
+    std::fs::create_dir_all(folder.join("browser").join("home").join("profile")).unwrap();
+    std::fs::write(
+        folder
+            .join("browser")
+            .join("home")
+            .join("profile")
+            .join("Cookies"),
+        b"synthetic cache",
+    )
+    .unwrap();
+    std::fs::write(folder.join("keep-evidence.txt"), b"retained evidence").unwrap();
+    task.state = "running".into();
+    task.result = None;
+    task.finished_at = None;
+    core.store.put("tasks", &task.id, &task).unwrap();
+    drop(core);
+    let reopened = AppCore::open(&data).unwrap();
+    let interrupted: Task = reopened.store.get("tasks", &task.id).unwrap();
+    assert_eq!(interrupted.state, "interrupted");
+    assert!(!folder.join("browser/home").exists());
+    assert_eq!(
+        std::fs::read(folder.join("keep-evidence.txt")).unwrap(),
+        b"retained evidence"
+    );
+}
+
+#[tokio::test]
+async fn browser_workspace_has_no_project_or_host_authority() {
+    let tmp = tempfile::tempdir().unwrap();
+    let core = AppCore::open(tmp.path()).unwrap();
+    let project = core.browser_workspace().unwrap();
+    assert!(project.browser_only);
+    assert_eq!(project.id, core.browser_workspace().unwrap().id);
+    let root = ConfinedRoot::open(Path::new(&project.path)).unwrap();
+    let started = core
+        .start(
+            &project.id,
+            "Prepare for Codex",
+            "handoff",
+            None,
+            Mode::Assisted,
+            None,
+        )
+        .unwrap();
+    let mut task = finish(&core, &started.id, false).await;
+    task.intent = Intent::Execute;
+    let mut session = Session::new(CancellationToken::new());
+    for name in ["read_file", "apply_patch", "run_project_command"] {
+        assert_eq!(
+            core.execute_tool(&mut task, &project, &root, name, json!({}), &mut session)
+                .await
+                .unwrap_err()
+                .code,
+            "BROWSER_WORKSPACE"
+        );
+    }
+}
+
+#[tokio::test]
+async fn browser_and_viewport_survive_balanced_to_strong_without_reopening() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/", listener.local_addr().unwrap());
+    let site = tokio::spawn(async move {
+        loop {
+            let Ok((mut stream, _)) = listener.accept().await else {
+                break;
+            };
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let _ = stream.read(&mut buf).await;
+                let body = r#"<!doctype html><title>Continuation fixture</title><button onclick="document.querySelector('p').textContent='After escalation'">Continue fixture</button><p>Before escalation</p>"#;
+                let _=stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).as_bytes()).await;
+            });
+        }
+    });
+    let target = url.clone();
+    let (endpoint,runtime,_)=mock_runtime(Arc::new(move|body,index|match index {
+        0=>tool("browser_open",json!({"url":target,"profile":"local_test","steps":[]})),
+        1=>tool("browser_action",json!({"action":"screenshot"})),
+        2=>tool("read_file",json!({"path":"math.cjs"})),
+        3|4=>tool("run_project_command",json!({"recipeId":"npm:test"})),
+        5=>{assert_eq!(body["model"],"fixture:strong");assert_eq!(body["messages"][1]["images"].as_array().unwrap().len(),1);assert!(body["messages"][1]["content"].as_str().unwrap().contains("browser_open"));tool("browser_action",json!({"action":"click","element":"1:1"}))},
+        6=>tool("apply_patch",json!({"path":"math.cjs","expectedHash":hash(b"module.exports.add = (a,b) => a-b;\n"),"hunks":[{"oldText":"a-b","newText":"a+b"}]})),
+        _=>tool("finish_task",json!({"summary":"Verified retained browser state","unresolved":[]}))
+    })).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let node = commands::find_program("node.exe").expect("Node required for browser QA");
+    let helper = workspace.join("browser-helper/main.cjs");
+    let chromium = workspace.join(".local-data/browsers/chromium-1248/chrome-win64/chrome.exe");
+    let component = crate::browser::Component {
+        node_hash: hash(&std::fs::read(&node).unwrap()),
+        node,
+        helper_hash: hash(&std::fs::read(&helper).unwrap()),
+        helper: helper.to_string_lossy().into(),
+        chromium_hash: hash(&std::fs::read(&chromium).unwrap()),
+        chromium: chromium.to_string_lossy().into(),
+    };
+    core.store.put("browser", "component", &component).unwrap();
+    let project = project(&core, &tmp.path().join("project"));
+    let task = core
+        .start(
+            &project.id,
+            &format!("Fix math.cjs and verify the disposable browser fixture at {url}"),
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Project,
+            None,
+        )
+        .unwrap();
+    let done = finish(&core, &task.id, true).await;
+    assert_eq!(done.state, "review_ready", "{}", done.summary);
+    assert_eq!(done.stages.len(), 2);
+    let observations = done
+        .events
+        .iter()
+        .filter(|e| e.title == "Browser observation")
+        .map(|e| serde_json::from_str::<Value>(&e.detail).unwrap())
+        .collect::<Vec<_>>();
+    let first = &observations.first().unwrap()["observation"];
+    let last = &observations.last().unwrap()["observation"];
+    assert_eq!(first["session"], last["session"]);
+    assert!(last["text"].as_str().unwrap().contains("After escalation"));
+    assert_eq!(crate::images::ids(&done.inputs).len(), 1);
+    assert_eq!(done.checks.last().unwrap().status, "passed");
+    runtime.abort();
+    site.abort();
+}
+
+#[tokio::test]
 async fn legacy_proposal_without_finish_timestamp_can_be_continued() {
     let (endpoint, server, _) = mock_runtime(Arc::new(|_, _| json!({"message":{"role":"assistant","content":"Please review the retained proposal."},"done":true}))).await;
     let tmp = tempfile::tempdir().unwrap();
@@ -135,6 +285,19 @@ async fn intent_matrix_and_context_followup() {
     let p = project(&core, &tmp.path().join("project"));
     for (request, intent) in [
         ("What is wrong with math.cjs?", Intent::Inspect),
+        (
+            "Open the Tauri documentation and explain the current tray API.",
+            Intent::Inspect,
+        ),
+        (
+            "Can this application support browser tasks?",
+            Intent::Converse,
+        ),
+        (
+            "Знайди помилку на локальному сайті та виправ її.",
+            Intent::Execute,
+        ),
+        ("Відкрий цю сторінку і коротко поясни її.", Intent::Inspect),
         ("Поясни, чому math.cjs працює неправильно.", Intent::Inspect),
         (
             "Знайди помилку, але поки нічого не змінюй.",

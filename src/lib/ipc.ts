@@ -31,6 +31,7 @@ export function errorOf(error: unknown): AppError {
 export const api = {
   bootstrap: () => call<Bootstrap>('bootstrap'),
   openProject: () => call<Project | null>('open_project'),
+  browserWorkspace: () => call<Project>('browser_workspace'),
   startTask: (projectId: string, request: string, preset: string, model: string | null, mode: Mode, parentTaskId: string | null, inputs: ContentBlock[] = []) => call<Task>('start_task', { projectId, request, preset, model, mode, parentTaskId, inputs }),
   task: (taskId: string) => call<Task>('get_task', { taskId }),
   cancel: (taskId: string) => call<void>('cancel_task', { taskId }),

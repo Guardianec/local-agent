@@ -27,6 +27,14 @@ pub async fn bootstrap(window: WebviewWindow, core: State<'_, Arc<AppCore>>) -> 
     core.bootstrap()
 }
 #[tauri::command]
+pub async fn browser_workspace(
+    window: WebviewWindow,
+    core: State<'_, Arc<AppCore>>,
+) -> Result<Project> {
+    check(&window)?;
+    core.browser_workspace()
+}
+#[tauri::command]
 pub async fn open_project(
     window: WebviewWindow,
     core: State<'_, Arc<AppCore>>,

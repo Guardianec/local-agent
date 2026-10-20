@@ -110,6 +110,8 @@ pub struct Recipe {
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../src/generated/")]
 pub struct Project {
+    #[serde(default)]
+    pub browser_only: bool,
     pub id: String,
     pub name: String,
     pub path: String,

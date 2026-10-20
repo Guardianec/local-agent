@@ -1,8 +1,10 @@
 pub mod agent;
 pub mod browser;
+pub mod browser_session;
 pub mod calibration;
 pub mod commands;
 pub mod continuation;
+pub mod dev_server;
 pub mod domain;
 pub mod environment;
 pub mod fs;
@@ -21,6 +23,7 @@ pub mod security;
 pub mod snapshots;
 pub mod store;
 pub mod tools;
+pub mod web;
 
 pub fn run() {
     use tauri::{Emitter, Manager};
@@ -37,7 +40,7 @@ pub fn run() {
             let handle=app.handle().clone();core.set_listener(std::sync::Arc::new(move|task|{let _=handle.emit_to("main","task-updated",task);}));
             app.manage(core);Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ipc::bootstrap,ipc::open_project,ipc::start_task,ipc::get_task,ipc::cancel_task,ipc::answer_approval,ipc::get_review,ipc::change_files,ipc::runtime_status,ipc::probe_model,ipc::calibrate_model,ipc::save_settings,ipc::choose_tool,ipc::handoff_preview,ipc::export_handoff,ipc::open_runtime_help,ipc::install_browser,ipc::model_catalog,ipc::install_model,ipc::model_install_progress,ipc::model_cleanup_candidates,ipc::remove_obsolete_model,ipc::ingest_image,ipc::choose_images,ipc::image_preview])
+        .invoke_handler(tauri::generate_handler![ipc::bootstrap,ipc::browser_workspace,ipc::open_project,ipc::start_task,ipc::get_task,ipc::cancel_task,ipc::answer_approval,ipc::get_review,ipc::change_files,ipc::runtime_status,ipc::probe_model,ipc::calibrate_model,ipc::save_settings,ipc::choose_tool,ipc::handoff_preview,ipc::export_handoff,ipc::open_runtime_help,ipc::install_browser,ipc::model_catalog,ipc::install_model,ipc::model_install_progress,ipc::model_cleanup_candidates,ipc::remove_obsolete_model,ipc::ingest_image,ipc::choose_images,ipc::image_preview])
         .run(tauri::generate_context!())
         .expect("Local Agent could not start");
 }

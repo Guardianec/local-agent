@@ -40,6 +40,7 @@ pub fn inspect(path: &Path, settings: &Settings) -> Result<Project> {
         .to_string_lossy()
         .into_owned();
     Ok(Project {
+        browser_only: false,
         id: id(),
         name,
         path: path.to_string_lossy().into(),
@@ -98,6 +99,7 @@ pub fn recipes(root: &ConfinedRoot, stack: &str) -> Result<Vec<Recipe>> {
                     "lint" | "lint:fix" => "lint",
                     "format" | "format:check" => "format",
                     "build" | "typecheck" | "check" => "build",
+                    "dev" | "start" => "dev_server",
                     _ => continue,
                 };
                 recipes.push(Recipe {

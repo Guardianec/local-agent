@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { outcomeText, diagnostics } from './outcome';
 import { AlertTriangle, Check, ChevronDown, Circle, FilePenLine, Search, Shield, TerminalSquare } from 'lucide-react';
 import type { Task } from '../../generated/Task';
+import { BrowserEvidence } from './BrowserEvidence';
 const icons: Record<string, typeof Circle> = { warning: AlertTriangle, validation: Check, changes: FilePenLine, approval: Shield, tool: Search, usage: TerminalSquare };
 export function Activity({ task, onRetry }: { task: Task; onRetry?: () => void }) {
   const [copyStatus, setCopyStatus] = useState('');
   const answer = outcomeText(task);
   return <div className="activity"><div className="activity-request"><span className="request-avatar">You</span><div><div className="eyebrow">TASK</div><p>{task.request}</p></div></div>
+    <BrowserEvidence task={task}/>
     <details open={!answer}><summary>Activity details</summary><div className="timeline">{task.events.map(event => {
       const Icon = icons[event.kind] ?? Circle;
       return <div className={`timeline-event ${event.kind}`} key={event.id}><span className="timeline-dot"><Icon size={14}/></span><div className="timeline-content">{event.detail ? <details><summary><span>{event.title}</span><ChevronDown size={13}/><time>{new Date(event.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></summary><pre>{event.detail}</pre></details> : <div className="event-title">{event.title}<time>{new Date(event.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>}</div></div>;
