@@ -21,6 +21,7 @@ Meaningful changes are grouped by application version, using Keep a Changelog-st
 
 - 108 native unit tests, eight local integration tests, the separately run external HTTPS browser test, 14 frontend tests, strict Clippy, production frontend build, native Apply/Undo and browser-workspace UI checks.
 - Real Fast public/Ukrainian/vision tasks and a Balanced browser-reproduce/edit/test/retest task on synthetic fixtures. Strong browser acceptance remains unproven because of the unchanged memory preflight. See [QA](docs/QA_0.4.0.md).
+- Published the production installer from commit `047e1a9`; installed UI and exact Tauri bundle-marker comparison passed. An immediate repeat update/startup preserved all 44 existing records. Public installer/checksum download, tag target, visibility, default branch and rendered README/image were verified.
 
 ## [0.3.2] - 2026-10-19
 

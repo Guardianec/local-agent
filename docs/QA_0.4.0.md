@@ -63,3 +63,9 @@ Inspection also found temporary Chromium files left by process termination. Clea
 Downloads, uploads, persistent authentication and dynamic authenticated submissions are deferred. Simple static submission is implemented with native exact-request approval but was not tested against a real public write service. No purchase/message-success claim follows from an HTTP receipt. There was no exhaustive hostile-site, DNS-rebinding infrastructure, crash/power-loss, multi-hour soak or accessibility audit. Request controls are not an OS egress firewall; approved project scripts run as the user. No weights, private logs, task databases or personal screenshots belong in the release.
 
 The production installer is built from committed source by `scripts/build-release.ps1`; installer testing and public tag/asset/checksum verification are separate release gates. Private local build provenance is not distributed.
+
+## Publication verification
+
+Published [v0.4.0](https://github.com/Guardianec/local-agent/releases/tag/v0.4.0) from clean commit `047e1a9f5d084eade5bc4ece3ec1c0532d238ba7`. The production pipeline repeated checks and produced `Local-Agent_0.4.0_x64-setup.exe` (8,241,364 bytes). Installed UI launch/version passed; executable bytes matched the build apart from the exact Tauri NSIS bundle marker. The first record comparison involved a differing historical QA snapshot and was not counted as preservation evidence. Both snapshots were retained. A dedicated fresh backup and immediate repeat update/startup preserved all 44 current records byte-for-byte.
+
+The unauthenticated public download matched SHA256 `cb58e0bec651f96030eced6dfaec8c1fc5d8172c12b4424cf44b58d9332e89f2` and the attached SHA256SUMS. Public visibility, main default branch, annotated tag target, rendered README links and accessible synthetic image passed. The tag and assets remain unchanged; this documentation follow-up records completed external checks.
