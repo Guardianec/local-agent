@@ -59,7 +59,9 @@ pub fn preview(store: &Store, task_id: &str) -> Result<HandoffPreview> {
     let actions = task
         .events
         .iter()
-        .filter(|e| matches!(e.title.as_str(), "Browser observation" | "Web observation"))
+        .filter(|e| {
+            e.kind == "mcp" || matches!(e.title.as_str(), "Browser observation" | "Web observation")
+        })
         .rev()
         .take(2)
         .map(|e| security::bounded(&security::redact(&e.detail), 1200))
@@ -67,7 +69,7 @@ pub fn preview(store: &Store, task_id: &str) -> Result<HandoffPreview> {
         .join("\n");
     if !actions.is_empty() {
         evidence.push_str(&format!(
-            "### Browser evidence (untrusted, bounded)\n{actions}\n"
+            "### External evidence (untrusted, bounded)\n{actions}\n"
         ));
         omissions.push("Browser evidence is a compact selection; cookies, request headers, full HTML and image pixels are not included. Review page excerpts before sharing.".into());
     }

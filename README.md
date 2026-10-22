@@ -1,6 +1,6 @@
 # Local Agent
 
-**0.4.0 — Browser & Web Operator:** read public pages, inspect disposable local apps, and verify a website repair in the same task. [Supported actions and boundaries](docs/BROWSER_OPERATOR.md) · [Measured QA and limits](docs/QA_0.4.0.md).
+**0.5.0 — MCP & Capability Routing:** connect GitHub, Context7 or custom MCP servers, expose relevant tools per task, and review outgoing calls. [Setup and limits](docs/MCP.md) · [Actual acceptance results](docs/QA_0.5.0_COMPLETION.md).
 
 A Windows desktop application for bounded coding tasks using models running on your own PC. Describe a task, inspect the agent's activity, review a diff, and explicitly apply or undo the changes.
 
@@ -8,7 +8,15 @@ Built with Tauri 2, React, TypeScript and Rust. Inference uses Ollama's local AP
 
 [Download Windows installer](https://github.com/Guardianec/local-agent/releases/latest) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md) · [Development history](docs/DEVELOPMENT_HISTORY.md) · [Contributing](CONTRIBUTING.md)
 
-## 0.4.0 browser and web operation
+## A real integration task
+
+“Why did the latest GitHub Actions run fail?” selected GitHub read tools. Balanced read the failed Windows-check run and a bounded log tail, identified the failing Rust test, and produced a report in 50.85 seconds with three MCP evidence calls and no file changes. Its root-cause hypotheses remain unverified. The credential was absent from the task and offline handoff records.
+
+“Use Context7 to check Tauri's tray icon API” resolved the library and queried its docs in 17.93 seconds with Balanced. Fast and Strong also completed that fixture; Strong needed a supported 16K context because the unchanged RAM gate refused the 32K attempt. These are small-fixture observations, not speed or quality guarantees.
+
+Settings → Integrations supports official read-only GitHub/Context7 presets and installed custom stdio/Streamable HTTP servers. Connections are lazy, credentials are Windows encrypted, and each call requires review of outgoing arguments. Custom programs run with your user permissions; external effects are outside Apply/Undo. OAuth/refresh/elicitation and schema references/regex are unsupported. [Full setup](docs/MCP.md).
+
+## Earlier 0.4.0 browser and web operation
 
 Choose **Browser tasks** without opening a repository, or work in a project's private task copy to reproduce and repair a web bug. Anonymous static retrieval needs no Chromium. Optional isolated Chromium adds semantic controls, tabs, diagnostics and selective screenshots using the existing encrypted image storage. Approved development servers live with the task and stop before it finishes. Simple static public submissions require a separate review of the exact request; downloads, uploads and persistent sign-in remain deferred.
 
@@ -136,6 +144,8 @@ Browser integration tests need matching Chromium. Setup, isolated UI testing and
 - Small-fixture benchmarks and targeted recovery tests are not exhaustive adversarial, crash, accessibility or multi-hour stress tests.
 
 ## Roadmap
+
+MCP setup, supported transports, authority boundaries and retained limits are documented in [MCP](docs/MCP.md). The [QA completion record](docs/QA_0.5.0_COMPLETION.md) distinguishes actual acceptance from deferred integrations and exhaustive testing.
 
 Planned, not shipped:
 

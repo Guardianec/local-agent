@@ -2,6 +2,13 @@
 
 Meaningful changes are grouped by application version, using Keep a Changelog-style sections. Earlier milestones are reconstructed from existing architecture/acceptance documents, not invented Git commits or tags. The first public source release is 0.3.0.
 
+## [0.5.0] - 2026-10-22
+
+- Add official rmcp 3.6.0 client foundation, modern/legacy compatibility, supervised stdio, bounded Streamable HTTP, protected credentials and Settings integration configuration.
+- Add selective task capability groups, controlled acquisition, bounded MCP schemas, exact-call approvals and compact external evidence in continuation/handoff.
+- Add compact connected-tool search, persisted safe integration diagnostics, credential clearing/header references and native capability visibility.
+- Verify modern/legacy stdio/HTTP/SSE, fault/policy/cleanup fixtures, real Fast/Balanced/Strong documentation tasks, authenticated GitHub CI analysis and native configuration/restart checks. Strong 32K availability remains RAM-dependent; see [QA](docs/QA_0.5.0_COMPLETION.md).
+
 ## [0.4.0] - 2026-10-20
 
 ### Added

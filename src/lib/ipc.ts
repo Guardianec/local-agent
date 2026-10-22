@@ -16,6 +16,7 @@ import type { ImageAttachment } from '../generated/ImageAttachment';
 import type { ModelSpec } from '../generated/ModelSpec';
 import type { ModelInstallProgress } from '../generated/ModelInstallProgress';
 import type { CleanupCandidate } from '../generated/CleanupCandidate';
+import type { Integration } from '../generated/Integration';
 
 async function call<T>(name: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) throw { code: 'DESKTOP_REQUIRED', message: 'Open the Local Agent desktop app to work with project files.', details: 'The browser preview has no filesystem or command access.' } satisfies AppError;
@@ -29,6 +30,11 @@ export function errorOf(error: unknown): AppError {
   return { code: 'UNEXPECTED', message: 'The operation could not be completed.', details: String(error) };
 }
 export const api = {
+  integrationStatus: () => call<Record<string, { state: string; authentication: string; lastError: string | null; protocol: string; tools: [string, string][]; withheld: number; checkedAt: string }>>('integration_status'),
+  integrations: () => call<Integration[]>('integrations'),
+  saveIntegration: (config: Integration, secret: string | null, confirmed: boolean) => call<Integration>('save_integration', { config, secret, confirmed }),
+  removeIntegration: (id: string) => call<void>('remove_integration', { id }),
+  testIntegration: (id: string) => call<{ status: string; protocol: string; capability: string; tools: { name: string; effect: string }[] }>('test_integration', { id }),
   bootstrap: () => call<Bootstrap>('bootstrap'),
   openProject: () => call<Project | null>('open_project'),
   browserWorkspace: () => call<Project>('browser_workspace'),

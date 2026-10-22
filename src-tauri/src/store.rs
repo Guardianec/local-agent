@@ -109,6 +109,16 @@ impl Store {
         }
         Ok(bytes)
     }
+    pub(crate) fn remove(&self, kind: &str, id: &str) -> Result<()> {
+        self.conn
+            .lock()
+            .map_err(|_| AppError::new("STORAGE", "Storage is busy."))?
+            .execute(
+                "DELETE FROM records WHERE kind=?1 AND id=?2",
+                params![kind, id],
+            )?;
+        Ok(())
+    }
     pub fn settings(&self) -> Settings {
         let mut settings: Settings = self.get("settings", "main").unwrap_or_else(|_| Settings {
             theme: "dark".into(),

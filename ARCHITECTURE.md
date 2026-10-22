@@ -1,5 +1,9 @@
 # Local Agent architecture
 
+## 0.5.0 capabilities and MCP
+
+The official Rust rmcp SDK owns modern/legacy protocol compatibility. `mcp.rs` owns strict integration configuration, protected credentials, discovery and connections; `mcp_http.rs` applies bounded DNS-pinned HTTP policy. `capabilities.rs` builds the native/integration catalog and selects groups. `agent_mcp.rs` brokers task acquisition, compact tool search, selected schemas and reviewed calls. Connections live in the existing task Session across local escalation and close before terminal publication. Settings uses narrow native IPC and persists safe diagnostics separately from credentials. See [decision 007](docs/decisions/007-mcp-capabilities.md) and [completed acceptance](docs/QA_0.5.0_COMPLETION.md).
+
 ## 0.4.0 browser operator
 
 `browser_session.rs` owns the task-lived typed transport, origin grants, bounded operations and cleanup over the existing helper/Job boundary. `browser.rs` remains the Rust HTTP/DNS/IP authority and retains deterministic scenarios. `web.rs` uses that broker for anonymous static retrieval without Chromium. `dev_server.rs` supervises approved development scripts in the task copy. The existing agent Session survives local tier escalation and is closed before terminal publication.

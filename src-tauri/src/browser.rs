@@ -245,7 +245,7 @@ pub fn install(store: &Store, source: &Path, cancel: CancellationToken) -> Resul
     store.put("browser", "component", &c)?;
     Ok(c)
 }
-fn public_ip(ip: IpAddr) -> bool {
+pub(crate) fn public_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(a) => {
             let o = a.octets();

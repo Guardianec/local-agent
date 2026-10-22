@@ -8,4 +8,6 @@ The packaged optional helper retains dependency license/notice files. Separately
 
 Static HTML retrieval uses the [html5ever tokenizer](https://github.com/servo/html5ever), licensed MIT OR Apache-2.0. Its version is pinned in Cargo.lock.
 
+MCP uses the official rmcp Rust SDK (Apache-2.0), process-wrap (Apache-2.0 OR MIT), jsonschema (MIT), sse-stream (MIT OR Apache-2.0) and http (MIT OR Apache-2.0). Locked crate metadata and bundled license files remain authoritative.
+
 Default references: [Fast](https://ollama.com/library/qwen3.5:4b-q8_0), [Balanced](https://ollama.com/library/qwen3.5:9b-q4_K_M), [Strong](https://ollama.com/library/qwen3.6:35b-a3b-q4_K_M). No model weights are included in source or installer.

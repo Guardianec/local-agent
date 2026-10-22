@@ -1,3 +1,5 @@
+#[path = "agent_mcp.rs"]
+mod mcp_execution;
 #[path = "agent_tools.rs"]
 mod tool_execution;
 use crate::{
@@ -604,6 +606,11 @@ impl AppCore {
                 "The task stopped unexpectedly. Retained work is available for review.",
             ))
         });
+        for (_, connection) in session.mcp.drain() {
+            if let Err(error) = connection.close().await {
+                result = Err(error);
+            }
+        }
         if let Some(browser) = session.browser.take() {
             if let Err(error) = browser.close().await {
                 result = Err(error);
@@ -974,6 +981,14 @@ impl AppCore {
                 )
             });
         }
+        let selected = crate::capabilities::route(
+            task.intent,
+            &task.request,
+            project.browser_only,
+            !project.recipes.is_empty(),
+        );
+        crate::capabilities::filter_native(&mut definitions, &selected);
+        self.prepare_capabilities(task, project, session).await?;
         let mut context = crate::registry::context(&settings, &choice.profile);
         let initial = if task.intent == Intent::Converse || project.browser_only {
             String::new()
@@ -1026,6 +1041,12 @@ impl AppCore {
         let mut pending_escalation: Option<String> = None;
         loop {
             session.check(task)?;
+            definitions.retain(|definition| {
+                definition["function"]["name"]
+                    .as_str()
+                    .is_none_or(|name| !name.starts_with("mcp_") && name != "request_capability")
+            });
+            definitions.extend(self.mcp_definitions(task, session)?);
             if session.browser_enabled
                 && !definitions
                     .iter()
@@ -1672,6 +1693,8 @@ impl AppCore {
                 "external_effect"
             } else if operation.starts_with("browser") {
                 "browser_access"
+            } else if operation.starts_with("mcp_") {
+                "external_effect"
             } else if operation == "command" {
                 "host_execution"
             } else {
@@ -2108,6 +2131,10 @@ struct Session {
     dev_server: Option<crate::dev_server::DevServer>,
     browser_enabled: bool,
     browser_visual_captured: bool,
+    mcp: HashMap<String, crate::mcp::Connection>,
+    mcp_exposed: HashMap<String, (String, crate::mcp::ToolInfo)>,
+    mcp_preferred: HashSet<String>,
+    capability_groups: Option<std::collections::BTreeSet<String>>,
 }
 impl Session {
     fn new(cancel: CancellationToken) -> Self {
@@ -2125,6 +2152,10 @@ impl Session {
             dev_server: None,
             browser_enabled: false,
             browser_visual_captured: false,
+            mcp: HashMap::new(),
+            mcp_exposed: HashMap::new(),
+            mcp_preferred: HashSet::new(),
+            capability_groups: None,
         }
     }
     fn check(&self, _task: &Task) -> Result<()> {

@@ -7,8 +7,10 @@ const icons: Record<string, typeof Circle> = { warning: AlertTriangle, validatio
 export function Activity({ task, onRetry }: { task: Task; onRetry?: () => void }) {
   const [copyStatus, setCopyStatus] = useState('');
   const answer = outcomeText(task);
+  const capabilities = [...new Set(task.events.filter(event => event.kind === 'capability' && event.title.startsWith('Using ')).map(event => event.title.slice(6)))];
   return <div className="activity"><div className="activity-request"><span className="request-avatar">You</span><div><div className="eyebrow">TASK</div><p>{task.request}</p></div></div>
     <BrowserEvidence task={task}/>
+    {capabilities.length > 0 && <p className="muted" role="status">Capabilities: {capabilities.join(' · ')}</p>}
     <details open={!answer}><summary>Activity details</summary><div className="timeline">{task.events.map(event => {
       const Icon = icons[event.kind] ?? Circle;
       return <div className={`timeline-event ${event.kind}`} key={event.id}><span className="timeline-dot"><Icon size={14}/></span><div className="timeline-content">{event.detail ? <details><summary><span>{event.title}</span><ChevronDown size={13}/><time>{new Date(event.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></summary><pre>{event.detail}</pre></details> : <div className="event-title">{event.title}<time>{new Date(event.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>}</div></div>;

@@ -1,6 +1,16 @@
 use crate::{agent::AppCore, domain::*, handoff};
+use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tauri::{State, WebviewWindow};
+
+#[tauri::command]
+pub async fn capability_catalog(
+    window: WebviewWindow,
+    core: State<'_, Arc<AppCore>>,
+) -> Result<Vec<crate::capabilities::Capability>> {
+    check(&window)?;
+    core.capability_catalog()
+}
 
 fn check(window: &WebviewWindow) -> Result<()> {
     if window.label() != "main" {
@@ -10,6 +20,51 @@ fn check(window: &WebviewWindow) -> Result<()> {
         ));
     }
     Ok(())
+}
+#[tauri::command]
+pub async fn integrations(
+    window: WebviewWindow,
+    core: State<'_, Arc<AppCore>>,
+) -> Result<Vec<crate::mcp::Integration>> {
+    check(&window)?;
+    core.integrations()
+}
+#[tauri::command]
+pub async fn integration_status(
+    window: WebviewWindow,
+    core: State<'_, Arc<AppCore>>,
+) -> Result<std::collections::BTreeMap<String, crate::mcp::IntegrationStatus>> {
+    check(&window)?;
+    core.integration_status()
+}
+#[tauri::command]
+pub async fn save_integration(
+    window: WebviewWindow,
+    core: State<'_, Arc<AppCore>>,
+    config: crate::mcp::Integration,
+    secret: Option<String>,
+    confirmed: bool,
+) -> Result<crate::mcp::Integration> {
+    check(&window)?;
+    core.save_integration(config, secret, confirmed)
+}
+#[tauri::command]
+pub async fn remove_integration(
+    window: WebviewWindow,
+    core: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<()> {
+    check(&window)?;
+    core.remove_integration(&id)
+}
+#[tauri::command]
+pub async fn test_integration(
+    window: WebviewWindow,
+    core: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<Value> {
+    check(&window)?;
+    core.test_integration(&id).await
 }
 #[tauri::command]
 pub async fn install_browser(window: WebviewWindow, core: State<'_, Arc<AppCore>>) -> Result<()> {

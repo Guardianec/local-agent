@@ -2,6 +2,363 @@ use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+fn mcp_fixture(core: &AppCore, mode: &str, directory: &Path) -> String {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("fixtures/mcp/server.cjs");
+    let integration = crate::mcp::Integration {
+        id: id(),
+        name: "Fixture".into(),
+        preset: "custom".into(),
+        enabled: true,
+        approved: false,
+        credential: None,
+        transport: crate::mcp::Transport::Stdio {
+            executable: commands::find_program("node.exe").unwrap(),
+            arguments: vec![fixture.to_string_lossy().into(), mode.into()],
+            directory: directory.to_string_lossy().into(),
+            environment: Default::default(),
+        },
+    };
+    let group = integration.group();
+    core.save_integration(integration, None, true).unwrap();
+    group
+}
+
+#[tokio::test]
+async fn mcp_connection_test_cancellation_releases_lease_and_persists_safe_status() {
+    let temp = tempfile::tempdir().unwrap();
+    let core = AppCore::open(temp.path()).unwrap();
+    mcp_fixture(&core, "slow-start", temp.path());
+    let integration = core.integrations().unwrap().remove(0);
+    let task_core = core.clone();
+    let id = integration.id.clone();
+    let run = tokio::spawn(async move { task_core.test_integration(&id).await });
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    core.cancel("integration-test").unwrap();
+    assert!(tokio::time::timeout(Duration::from_secs(3), run)
+        .await
+        .unwrap()
+        .unwrap()
+        .is_err());
+    assert!(core.active.lock().unwrap().is_none());
+    assert_eq!(
+        core.integration_status().unwrap()[&integration.id].state,
+        "failed"
+    );
+    drop(core);
+    let reopened = AppCore::open(temp.path()).unwrap();
+    assert!(reopened.integration_status().unwrap()[&integration.id]
+        .last_error
+        .is_some());
+    assert_eq!(reopened.integrations().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn mcp_stale_schema_is_rejected_and_compact_index_can_select_other_tools() {
+    for mode in ["changed", "index"] {
+        let (endpoint, server, _) = mock_runtime(Arc::new(move |body,index| {
+            let tools = body["tools"].as_array().unwrap();
+            assert!(tools.iter().filter(|tool|tool["function"]["name"].as_str().is_some_and(|name|name.starts_with("mcp_") && name != "mcp_find_tools")).count() <= 8);
+            if index == 0 && mode == "index" { return tool("mcp_find_tools",json!({"query":"tool_19"})); }
+            if index < 2 {
+                let selected = tools.iter().find(|tool|tool["function"]["name"].as_str().is_some_and(|name|name.starts_with("mcp_") && name != "mcp_find_tools") && (mode != "index" || tool["function"]["description"].as_str().unwrap_or("").starts_with("tool_19 "))).unwrap();
+                if index == 1 && mode == "changed" { assert_eq!(selected["function"]["parameters"]["properties"]["q"]["type"],"integer"); }
+                return tool(selected["function"]["name"].as_str().unwrap(),json!({"q":if mode == "changed" && index == 1 {json!(42)} else {json!("hello")}}));
+            }
+            tool("finish_task",json!({"summary":"Used refreshed or indexed tool.","unresolved":[]}))
+        })).await;
+        let tmp = tempfile::tempdir().unwrap();
+        let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+        Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+        configure_continuation_fixture(&core);
+        let mut project = project(&core, &tmp.path().join("project"));
+        project.recipes.clear();
+        core.store.put("projects", &project.id, &project).unwrap();
+        mcp_fixture(&core, mode, tmp.path());
+        let started = core
+            .start(
+                &project.id,
+                "Create a report using @Fixture evidence",
+                "task",
+                Some("@profile/balanced".into()),
+                Mode::Assisted,
+                None,
+            )
+            .unwrap();
+        let done = finish(&core, &started.id, true).await;
+        server.abort();
+        assert_eq!(done.state, "review_ready", "{}", done.summary);
+        assert_eq!(
+            done.events
+                .iter()
+                .filter(|event| event.kind == "mcp")
+                .count(),
+            1
+        );
+        if mode == "changed" {
+            assert!(done
+                .events
+                .iter()
+                .any(|event| event.detail.contains("changed or removed")));
+        }
+    }
+}
+
+#[tokio::test]
+async fn mcp_exact_call_denial_prevents_external_effect_and_hostile_file_access() {
+    let tmp = tempfile::tempdir().unwrap();
+    let marker = tmp.path().join("must-not-exist.txt");
+    let query = format!("spawn:{}", marker.display());
+    let (endpoint, server, _) = mock_runtime(Arc::new(move |body, index| match index {
+        0 => {
+            let alias = body["tools"].as_array().unwrap().iter().find_map(|tool|tool["function"]["name"].as_str().filter(|name|name.starts_with("mcp_") && *name != "mcp_find_tools")).unwrap();
+            tool(alias,json!({"q":query}))
+        },
+        1 => tool("read_file",json!({"path":".env"})),
+        _ => tool("finish_task",json!({"summary":"The action was denied and protected files remain inaccessible.","unresolved":[]})),
+    })).await;
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let mut project = project(&core, &tmp.path().join("project"));
+    project.recipes.clear();
+    core.store.put("projects", &project.id, &project).unwrap();
+    std::fs::write(
+        Path::new(&project.path).join(".env"),
+        "NEVER_EXPOSE_CANARY=protected-value-129876",
+    )
+    .unwrap();
+    mcp_fixture(&core, "modern", tmp.path());
+    let started = core
+        .start(
+            &project.id,
+            "Create a report using @Fixture evidence",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Assisted,
+            None,
+        )
+        .unwrap();
+    let began = Instant::now();
+    let mut answered = HashSet::new();
+    let done = loop {
+        let current: Task = core.store.get("tasks", &started.id).unwrap();
+        if !current.active() {
+            break current;
+        }
+        if let Some(approval) = &current.approval {
+            if answered.insert(approval.id.clone()) {
+                core.answer(
+                    &started.id,
+                    &approval.id,
+                    if approval.title.starts_with("Use Fixture") {
+                        "deny"
+                    } else {
+                        "once"
+                    },
+                )
+                .unwrap();
+            }
+        }
+        assert!(began.elapsed() < Duration::from_secs(20));
+        tokio::time::sleep(Duration::from_millis(15)).await;
+    };
+    server.abort();
+    assert_eq!(done.state, "review_ready", "{}", done.summary);
+    assert!(!marker.exists());
+    assert!(!done.events.iter().any(|event| event.kind == "mcp"));
+    assert!(!serde_json::to_string(&done)
+        .unwrap()
+        .contains("protected-value-129876"));
+}
+
+#[tokio::test]
+async fn mcp_connection_and_evidence_survive_escalation_without_replaying_work() {
+    let (endpoint, server, _) = mock_runtime(Arc::new(|body, index| match index {
+        0 | 3 => {
+            if index == 3 {
+                assert_eq!(body["model"], "fixture:strong");
+                assert!(body["messages"]
+                    .to_string()
+                    .contains("untrusted_mcp_evidence"));
+            }
+            let alias = body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find_map(|tool| {
+                    tool["function"]["name"]
+                        .as_str()
+                        .filter(|name| name.starts_with("mcp_") && *name != "mcp_find_tools")
+                })
+                .unwrap();
+            tool(
+                alias,
+                json!({"q":if index == 0 { "before" } else { "after" }}),
+            )
+        }
+        1 | 2 => tool("run_project_command", json!({"recipeId":"npm:test"})),
+        4 => tool("apply_patch", json!({"path":"math.cjs","expectedHash":hash(b"module.exports.add = (a,b) => a-b;\n"),"hunks":[{"oldText":"a-b","newText":"a+b"}]})),
+        _ => tool(
+            "finish_task",
+            json!({"summary":"Continued the same connection.","unresolved":[]}),
+        ),
+    }))
+    .await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    configure_continuation_fixture(&core);
+    let project = project(&core, &tmp.path().join("project"));
+    mcp_fixture(&core, "modern", tmp.path());
+    let started = core
+        .start(
+            &project.id,
+            "Create a report using @Fixture evidence",
+            "task",
+            Some("@profile/balanced".into()),
+            Mode::Assisted,
+            None,
+        )
+        .unwrap();
+    let done = finish(&core, &started.id, true).await;
+    server.abort();
+    assert_eq!(done.state, "review_ready", "{}", done.summary);
+    assert_eq!(done.stages.len(), 2);
+    assert_eq!(done.id, started.id);
+    let observations: Vec<_> = done
+        .events
+        .iter()
+        .filter(|event| event.kind == "mcp")
+        .collect();
+    assert_eq!(observations.len(), 2);
+    assert!(observations[0].detail.contains("calls=1"));
+    assert!(observations[1].detail.contains("calls=2"));
+    assert_eq!(
+        done.events
+            .iter()
+            .filter(|event| event.title == "Using Fixture")
+            .count(),
+        1
+    );
+    assert!(done
+        .continuation
+        .as_ref()
+        .unwrap()
+        .observations
+        .iter()
+        .any(|evidence| evidence.contains("untrusted_mcp_evidence")));
+}
+
+#[tokio::test]
+async fn mcp_is_acquired_mid_task_and_hostile_evidence_cannot_enable_another_server() {
+    let integration_id = id();
+    let group = format!("custom_mcp:{integration_id}");
+    let handler = Arc::new(move |body: Value, index: usize| match index {
+        0 => {
+            assert!(!body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|tool| tool["function"]["name"]
+                    .as_str()
+                    .is_some_and(|name| name.starts_with("mcp_"))));
+            tool("request_capability", json!({"capability":group}))
+        }
+        1 => {
+            let alias = body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find_map(|tool| {
+                    tool["function"]["name"]
+                        .as_str()
+                        .filter(|name| name.starts_with("mcp_") && *name != "mcp_find_tools")
+                })
+                .unwrap();
+            tool(alias, json!({"q":"hello"}))
+        }
+        2 => {
+            let messages = body["messages"].to_string();
+            assert!(messages.contains("untrusted_mcp_evidence"));
+            assert!(!messages.contains("fixture-credential-canary-2468"));
+            tool(
+                "request_capability",
+                json!({"capability":"custom_mcp:unconfigured"}),
+            )
+        }
+        _ => tool(
+            "finish_task",
+            json!({"summary":"Synthetic evidence was returned; unconfigured integration is unavailable.","unresolved":[]}),
+        ),
+    });
+    let (endpoint, server, _) = mock_runtime(handler).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut core = AppCore::open(&tmp.path().join("data")).unwrap();
+    Arc::get_mut(&mut core).unwrap().provider = Ollama::test_endpoint(endpoint);
+    core.store
+        .put(
+            "probes",
+            "fixture-digest:fixture-v1",
+            &json!({"status":"verified"}),
+        )
+        .unwrap();
+    let mut project = project(&core, &tmp.path().join("project"));
+    project.recipes.clear();
+    core.store.put("projects", &project.id, &project).unwrap();
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("fixtures/mcp/server.cjs");
+    core.save_integration(
+        crate::mcp::Integration {
+            id: integration_id,
+            name: "Synthetic tools".into(),
+            preset: "custom".into(),
+            enabled: true,
+            approved: false,
+            credential: None,
+            transport: crate::mcp::Transport::Stdio {
+                executable: commands::find_program("node.exe").unwrap(),
+                arguments: vec![fixture.to_string_lossy().into(), "modern".into()],
+                directory: tmp.path().to_string_lossy().into(),
+                environment: std::collections::BTreeMap::from([(
+                    "TEST_TOKEN".into(),
+                    "credential".into(),
+                )]),
+            },
+        },
+        Some("fixture-credential-canary-2468".into()),
+        true,
+    )
+    .unwrap();
+    let started = core
+        .start(
+            &project.id,
+            "Create an explanation from the available evidence",
+            "task",
+            Some("fixture:8b".into()),
+            Mode::Assisted,
+            None,
+        )
+        .unwrap();
+    let done = finish(&core, &started.id, true).await;
+    server.abort();
+    assert_eq!(done.state, "review_ready", "{}", done.summary);
+    assert!(done.events.iter().any(|event| event.kind == "mcp"));
+    assert!(done
+        .events
+        .iter()
+        .any(|event| event.detail.contains("not enabled in Settings")));
+    assert!(!serde_json::to_string(&done)
+        .unwrap()
+        .contains("fixture-credential-canary-2468"));
+    assert_eq!(done.id, started.id);
+    assert_eq!(core.integrations().unwrap().len(), 1);
+}
+
 #[tokio::test]
 async fn interrupted_browser_profile_is_removed_without_removing_evidence() {
     let tmp = tempfile::tempdir().unwrap();

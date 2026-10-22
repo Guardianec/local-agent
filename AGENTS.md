@@ -4,6 +4,8 @@ Read README.md, CONTRIBUTING.md, ARCHITECTURE.md and DECISIONS.md. Keep scope fo
 
 ## Mandatory maintenance
 
+For MCP work, read docs/MCP.md, docs/decisions/007-mcp-capabilities.md, docs/QA_0.5.0.md and HANDOFF_0.5.md. Verify current official SDK/spec behavior. Do not convert pending candidate gates into release claims or expose credentials through model tools, fixtures or acceptance examples.
+
 Every meaningful update must:
 
 - Bump the version when appropriate and align desktop manifests/lockfiles. Documentation-only corrections need not invent a version.

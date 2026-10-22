@@ -52,7 +52,22 @@ pub fn infer(
                     })
             })
         });
-    let inspect = matches!(preset, "search" | "review" | "tests" | "lint" | "explain")
+    let external =
+        crate::capabilities::route(Intent::Inspect, request, project.browser_only, false);
+    let integration_inspection = external.groups.contains("external_docs")
+        || external.groups.contains("github_read")
+            && contains(&[
+                "actions",
+                "workflow",
+                "issue",
+                "pull request",
+                " pr",
+                "commit",
+                "branch",
+                "repository",
+            ]);
+    let inspect = integration_inspection
+        || matches!(preset, "search" | "review" | "tests" | "lint" | "explain")
         || (project.browser_only
             && [
                 "open ",
@@ -252,7 +267,14 @@ pub fn failure(error: &AppError) -> TaskFailure {
         "VALIDATION_FAILED" => "VALIDATION_FAILED",
         "INFERENCE_LIMIT" => "CONTEXT_LIMIT",
         "HANDOFF_FAILED" => "CODEX_HANDOFF_FAILED",
-        "UNKNOWN_TOOL" => "TOOL_UNAVAILABLE",
+        "UNKNOWN_TOOL" | "MCP_UNAVAILABLE" | "MCP_DISABLED" | "CAPABILITY_UNAVAILABLE" => {
+            "TOOL_UNAVAILABLE"
+        }
+        "MCP_ARGUMENTS" | "MCP_SCHEMA" | "MCP_DISCOVERY" => "TOOL_CALL_INVALID",
+        "MCP_PROTOCOL" | "MCP_START" | "MCP_CLEANUP" => "TOOL_EXECUTION_FAILED",
+        "MCP_TIMEOUT" => "TOOL_TIMEOUT",
+        "MCP_CREDENTIAL" | "MCP_CONSENT" | "MCP_AUTH" => "TOOL_PERMISSION_DENIED",
+        "MCP_NETWORK" | "MCP_RATE_LIMIT" | "MCP_REDIRECT" => "TOOL_EXECUTION_FAILED",
         "READ_ONLY" | "PERMISSION_DENIED" | "APPROVAL_DENIED" | "APPROVAL_EXPIRED" => {
             "TOOL_PERMISSION_DENIED"
         }

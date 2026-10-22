@@ -74,7 +74,10 @@ pub fn capture(
         task.events
             .iter()
             .rev()
-            .filter(|e| matches!(e.title.as_str(), "Browser observation" | "Web observation"))
+            .filter(|e| {
+                e.kind == "mcp"
+                    || matches!(e.title.as_str(), "Browser observation" | "Web observation")
+            })
             .take(2)
             .map(|e| security::bounded(&security::redact(&e.detail), 1800)),
     );

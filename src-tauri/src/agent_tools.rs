@@ -57,6 +57,20 @@ impl AppCore {
             ));
         }
         task.tool_calls += 1;
+        if name == "request_capability" || name.starts_with("mcp_") {
+            return self.execute_mcp(task, name, args, session).await;
+        }
+        if let Some(groups) = &session.capability_groups {
+            if crate::capabilities::native_group(name).is_some_and(|group| {
+                !groups.contains(group)
+                    && !(session.browser_enabled && matches!(group, "browser" | "web_read"))
+            }) {
+                return Err(AppError::new(
+                    "CAPABILITY_UNAVAILABLE",
+                    "Request this capability before using its tools.",
+                ));
+            }
+        }
         if project.browser_only
             && !matches!(
                 name,

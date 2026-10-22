@@ -88,3 +88,10 @@ h1,h2,h3,p { margin:0; } h1,h2,h3 { font-weight:600; } pre,code { font-family:va
 .image-input { margin:0 0 10px; position:relative; width:130px; border:1px solid var(--border); border-radius:5px; overflow:hidden; background:var(--raised); }.image-input>img,.image-input>span { display:flex; align-items:center; justify-content:center; width:128px; height:88px; object-fit:contain; background:var(--bg); }.image-input figcaption { font-size:11px; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; padding:5px 7px; color:var(--muted); }.image-input button { position:absolute; right:3px; top:3px; background:var(--surface); width:24px; height:24px; }
 .image-attach-line { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }.image-attach-line>span { font-size:11px; color:var(--muted); }.image-attach-line button { font-size:12px; }
 .browser-evidence { margin:16px 0; padding:18px; border:1px solid var(--border); border-radius:7px; background:var(--surface); overflow-wrap:anywhere; } .browser-evidence h3 { margin:8px 0; } .browser-evidence p { margin:6px 0; color:var(--muted); font-size:13px; } .browser-evidence img { display:block; max-width:100%; margin-top:12px; border-radius:4px; }
+.integration-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.integration-card { border:1px solid var(--border); border-radius:6px; padding:14px; margin-top:12px; overflow-wrap:anywhere; }
+.integration-form { display:grid; gap:14px; margin-top:18px; padding:16px; background:var(--raised); border:1px solid var(--border); border-radius:6px; }
+.integration-form>label { display:grid; gap:7px; font-size:13px; }
+.integration-form input:not([type=checkbox]), .integration-form textarea, .integration-form select { width:100%; min-width:0; padding:8px; }
+.integration-form textarea { min-height:72px; resize:vertical; }
+.integration-form .strong-toggle { display:flex; }
